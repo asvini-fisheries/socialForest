@@ -29,9 +29,12 @@
 
 ## Admin Login
 
-- **Mobile:** `9999999999`
-- **Role:** admin
-- **OTP:** Requires Twilio SMS configuration in Supabase Dashboard
+| Method | Credential | Code |
+|--------|-----------|------|
+| **Mobile** | `9999999999` | `123456` (test OTP — no SMS needed) |
+| **Email** | `miswebapps@gmail.com` | Check inbox for verification code |
+
+> Mobile test OTP is configured in Supabase for development. For production, configure Twilio SMS or remove test OTP.
 
 To create additional admins:
 ```bash

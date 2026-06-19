@@ -1,22 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { TreePine, Phone, ArrowRight, Loader2 } from 'lucide-react';
+import { TreePine, Phone, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { validateMobile, maskMobile } from '@/lib/utils';
+import { getAuthErrorMessage, validateEmail, maskEmail } from '@/lib/auth-errors';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import type { User, Year, Project } from '@/types/database';
 import { ROLE_LABELS } from '@/types/database';
 
-type LoginStep = 'mobile' | 'otp' | 'selection';
+type LoginMethod = 'email' | 'mobile';
+type LoginStep = 'credentials' | 'otp' | 'selection';
 
 export function LoginForm() {
-  const [step, setStep] = useState<LoginStep>('mobile');
+  const [method, setMethod] = useState<LoginMethod>('email');
+  const [step, setStep] = useState<LoginStep>('credentials');
+  const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,65 +37,100 @@ export function LoginForm() {
 
   async function handleSendOtp() {
     setError('');
-    if (!validateMobile(mobile)) {
+
+    if (method === 'email') {
+      if (!validateEmail(email)) {
+        setError('Please enter a valid email address');
+        return;
+      }
+    } else if (!validateMobile(mobile)) {
       setError('Please enter a valid 10-digit mobile number');
       return;
     }
+
     setLoading(true);
     try {
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        phone: `+91${mobile}`,
-      });
+      const { error: otpError } =
+        method === 'email'
+          ? await supabase.auth.signInWithOtp({
+              email: email.trim().toLowerCase(),
+              options: { shouldCreateUser: false },
+            })
+          : await supabase.auth.signInWithOtp({
+              phone: `+91${mobile}`,
+              options: { shouldCreateUser: false },
+            });
+
       if (otpError) throw otpError;
       setStep('otp');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send OTP. Please try again.');
+      setError(getAuthErrorMessage(err, 'Failed to send verification code. Please try again.'));
     } finally {
       setLoading(false);
     }
   }
 
+  async function loadUserProfile(): Promise<User> {
+    let query = supabase.from('users').select('*');
+
+    if (method === 'email') {
+      query = query.eq('email', email.trim().toLowerCase());
+    } else {
+      query = query.eq('mobile', mobile);
+    }
+
+    const { data: profile, error: profileError } = await query.single();
+
+    if (profileError || !profile) {
+      throw new Error('User profile not found. Contact your administrator to create your account.');
+    }
+
+    if (profile.status !== 'active') {
+      throw new Error('Your account is inactive. Contact your administrator.');
+    }
+
+    return profile;
+  }
+
   async function handleVerifyOtp() {
     setError('');
     if (otp.length !== 6) {
-      setError('Please enter the 6-digit OTP');
+      setError('Please enter the 6-digit verification code');
       return;
     }
+
     setLoading(true);
     try {
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        phone: `+91${mobile}`,
-        token: otp,
-        type: 'sms',
-      });
+      const { error: verifyError } =
+        method === 'email'
+          ? await supabase.auth.verifyOtp({
+              email: email.trim().toLowerCase(),
+              token: otp,
+              type: 'email',
+            })
+          : await supabase.auth.verifyOtp({
+              phone: `+91${mobile}`,
+              token: otp,
+              type: 'sms',
+            });
+
       if (verifyError) throw verifyError;
 
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('mobile', mobile)
-        .single();
-
-      if (profileError || !profile) {
-        throw new Error('User profile not found. Contact administrator.');
-      }
-
-      if (profile.status !== 'active') {
-        throw new Error('Your account is inactive. Contact administrator.');
-      }
-
+      const profile = await loadUserProfile();
       setUserProfile(profile);
 
-      const { data: yearsData } = await supabase
+      const { data: yearsData, error: yearsError } = await supabase
         .from('years')
         .select('*')
         .eq('is_active', true)
         .order('start_date', { ascending: false });
 
+      if (yearsError) throw yearsError;
+
       setYears(yearsData || []);
       setStep('selection');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'OTP verification failed.');
+      setError(getAuthErrorMessage(err, 'Verification failed. Please check the code and try again.'));
     } finally {
       setLoading(false);
     }
@@ -141,7 +180,7 @@ export function LoginForm() {
       const { data: projectsData } = await query.order('name');
       setProjects(projectsData || []);
     } catch {
-      setError('Failed to load projects');
+      setError('Failed to load projects. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -164,6 +203,20 @@ export function LoginForm() {
     router.push('/dashboard');
   }
 
+  function resetToCredentials() {
+    setStep('credentials');
+    setOtp('');
+    setError('');
+  }
+
+  function switchMethod(next: LoginMethod) {
+    setMethod(next);
+    resetToCredentials();
+  }
+
+  const otpTarget =
+    method === 'email' ? maskEmail(email.trim().toLowerCase()) : maskMobile(mobile);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 p-4">
       <div className="w-full max-w-md">
@@ -178,13 +231,13 @@ export function LoginForm() {
         <Card>
           <CardHeader>
             <CardTitle>
-              {step === 'mobile' && 'Sign In'}
-              {step === 'otp' && 'Verify OTP'}
+              {step === 'credentials' && 'Sign In'}
+              {step === 'otp' && 'Verify Code'}
               {step === 'selection' && 'Select Project'}
             </CardTitle>
             <CardDescription>
-              {step === 'mobile' && 'Enter your registered mobile number'}
-              {step === 'otp' && `OTP sent to ${maskMobile(mobile)}`}
+              {step === 'credentials' && 'Sign in with your registered email or mobile number'}
+              {step === 'otp' && `Verification code sent to ${otpTarget}`}
               {step === 'selection' && userProfile && (
                 <span>
                   Welcome, {userProfile.full_name} ({ROLE_LABELS[userProfile.role]})
@@ -194,26 +247,68 @@ export function LoginForm() {
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
+              <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">
+                {error}
+              </div>
             )}
 
-            {step === 'mobile' && (
+            {step === 'credentials' && (
               <>
-                <Input
-                  label="Mobile Number"
-                  type="tel"
-                  placeholder="10-digit mobile number"
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  maxLength={10}
-                />
+                <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => switchMethod('email')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                      method === 'email'
+                        ? 'bg-white text-emerald-700 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Mail className="w-4 h-4" />
+                    Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchMethod('mobile')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                      method === 'mobile'
+                        ? 'bg-white text-emerald-700 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Phone className="w-4 h-4" />
+                    Mobile
+                  </button>
+                </div>
+
+                {method === 'email' ? (
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                ) : (
+                  <Input
+                    label="Mobile Number"
+                    type="tel"
+                    placeholder="10-digit mobile number"
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    maxLength={10}
+                    autoComplete="tel"
+                  />
+                )}
+
                 <Button onClick={handleSendOtp} disabled={loading} className="w-full" size="lg">
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      <Phone className="w-4 h-4" />
-                      Send OTP
+                      {method === 'email' ? <Mail className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+                      Send Verification Code
                     </>
                   )}
                 </Button>
@@ -223,30 +318,20 @@ export function LoginForm() {
             {step === 'otp' && (
               <>
                 <Input
-                  label="Enter OTP"
+                  label="Enter 6-digit code"
                   type="text"
-                  placeholder="6-digit OTP"
+                  inputMode="numeric"
+                  placeholder="000000"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   maxLength={6}
+                  autoComplete="one-time-code"
                 />
                 <Button onClick={handleVerifyOtp} disabled={loading} className="w-full" size="lg">
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Verify & Continue'
-                  )}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & Continue'}
                 </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setStep('mobile');
-                    setOtp('');
-                    setError('');
-                  }}
-                  className="w-full"
-                >
-                  Change Mobile Number
+                <Button variant="ghost" onClick={resetToCredentials} className="w-full">
+                  {method === 'email' ? 'Change Email' : 'Change Mobile Number'}
                 </Button>
               </>
             )}

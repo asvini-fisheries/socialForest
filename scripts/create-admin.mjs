@@ -30,6 +30,7 @@ loadEnv();
 
 const mobile = process.argv[2] || '9999999999';
 const fullName = process.argv[3] || 'System Admin';
+const email = process.argv[4] || null;
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -49,9 +50,12 @@ async function main() {
   if (existing) {
     const { error } = await supabase
       .from('users')
-      .update({ role: 'admin', status: 'active', full_name: fullName })
+      .update({ role: 'admin', status: 'active', full_name: fullName, ...(email ? { email } : {}) })
       .eq('id', existing.id);
     if (error) throw error;
+    if (email) {
+      await supabase.auth.admin.updateUserById(existing.id, { email, email_confirm: true });
+    }
     console.log(`Updated existing user ${existing.id} to admin`);
     return;
   }
@@ -59,6 +63,7 @@ async function main() {
   const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
     phone: `+91${mobile}`,
     phone_confirm: true,
+    ...(email ? { email, email_confirm: true } : {}),
     user_metadata: { full_name: fullName, role: 'admin' },
   });
 
@@ -67,6 +72,7 @@ async function main() {
   const { error: profileErr } = await supabase.from('users').upsert({
     id: authUser.user.id,
     mobile,
+    email,
     full_name: fullName,
     role: 'admin',
     status: 'active',
