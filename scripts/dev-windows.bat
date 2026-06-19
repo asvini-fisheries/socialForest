@@ -1,6 +1,27 @@
 @echo off
-REM SocialForest dev server — run from project root (where package.json lives)
+REM Run SocialForest dev server from the correct project root
 cd /d "%~dp0.."
-echo Starting SocialForest at http://localhost:4350
+
+if not exist "src\app" (
+  echo.
+  echo ERROR: src\app not found in %CD%
+  echo Run this from the socialForest folder after: git pull origin main
+  echo.
+  pause
+  exit /b 1
+)
+
+if not exist "package.json" (
+  echo ERROR: package.json not found in %CD%
+  pause
+  exit /b 1
+)
+
+echo.
+echo SocialForest project: %CD%
+echo Starting http://localhost:4350
+echo.
+
 call npm install
 call npm run dev
+pause
