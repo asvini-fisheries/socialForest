@@ -11,7 +11,12 @@ export interface MasterField {
   placeholder?: string;
   options?: { value: string; label: string }[];
   /** Load options dynamically from another table */
-  optionsFrom?: { table: string; valueKey: string; labelKey: string };
+  optionsFrom?: {
+    table: string;
+    valueKey: string;
+    labelKey: string;
+    labelSuffixKey?: string;
+  };
 }
 
 export interface MasterColumn<T> {
@@ -27,6 +32,7 @@ export interface MasterConfig {
   orderBy: string;
   fields: MasterField[];
   columns: MasterColumn<Record<string, unknown>>[];
+  selectQuery?: string;
   /** Use API route instead of direct Supabase for mutations */
   apiRoute?: string;
   /** Soft delete via is_active */

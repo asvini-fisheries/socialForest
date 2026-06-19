@@ -33,11 +33,14 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     setLoading(true);
     setError('');
     const supabase = createClient();
-    const { data, error: err } = await supabase.from(config.table).select('*').order(config.orderBy);
+    const { data, error: err } = await supabase
+      .from(config.table)
+      .select(config.selectQuery || '*')
+      .order(config.orderBy);
     if (err) setError(err.message);
-    else setRows(data || []);
+    else setRows((data as unknown as Record<string, unknown>[]) || []);
     setLoading(false);
-  }, [config.table, config.orderBy]);
+  }, [config.table, config.orderBy, config.selectQuery]);
 
   useEffect(() => {
     loadRows();
@@ -56,7 +59,10 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
           opts[field.name] =
             data?.map((r) => {
               const row = r as unknown as Record<string, string>;
-              return { value: row[field.optionsFrom!.valueKey], label: row[field.optionsFrom!.labelKey] };
+              const label = field.optionsFrom!.labelSuffixKey
+                ? `${row[field.optionsFrom!.labelKey]} (${row[field.optionsFrom!.labelSuffixKey]})`
+                : row[field.optionsFrom!.labelKey];
+              return { value: row[field.optionsFrom!.valueKey], label };
             }) || [];
         }
       }

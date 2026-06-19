@@ -2,7 +2,7 @@
 
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Building2, Handshake, Activity, Package, Calendar, Award, Briefcase } from 'lucide-react';
+import { Users, Building2, Handshake, Activity, Package, Calendar, Award, Briefcase, Tags } from 'lucide-react';
 import Link from 'next/link';
 
 const MASTER_MODULES = [
@@ -12,7 +12,8 @@ const MASTER_MODULES = [
   { title: 'Organisations', description: 'Executing organisations with contacts & certificates', href: '/masters/organisations', icon: Building2, count: 0 },
   { title: 'Stakeholders', description: 'Contractors, suppliers, and service providers', href: '/masters/stakeholders', icon: Briefcase, count: 0 },
   { title: 'Activities', description: 'Project activity types master', href: '/masters/activities', icon: Activity, count: 12 },
-  { title: 'Resources', description: 'Materials and tree species master', href: '/masters/resources', icon: Package, count: 13 },
+  { title: 'Resource Categories', description: 'Material or service categories for resources', href: '/masters/resource-categories', icon: Tags, count: 7 },
+  { title: 'Resources', description: 'Materials, services, and tree species', href: '/masters/resources', icon: Package, count: 13 },
   { title: 'Designations', description: 'Employee designation master', href: '/masters/designations', icon: Users, count: 8 },
   { title: 'Certificates', description: 'Certificate types master', href: '/masters/certificates', icon: Award, count: 7 },
 ];

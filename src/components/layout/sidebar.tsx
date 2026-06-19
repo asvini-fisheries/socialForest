@@ -23,6 +23,7 @@ import {
   X,
   ClipboardList,
   Wrench,
+  Tags,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
@@ -62,6 +63,7 @@ const MASTER_SUB_ITEMS = [
   { label: 'Organisations', href: '/masters/organisations', icon: Building2 },
   { label: 'Stakeholders', href: '/masters/stakeholders', icon: Users },
   { label: 'Activities', href: '/masters/activities', icon: Activity },
+  { label: 'Resource Categories', href: '/masters/resource-categories', icon: Tags },
   { label: 'Resources', href: '/masters/resources', icon: Package },
   { label: 'Designations', href: '/masters/designations', icon: ClipboardList },
   { label: 'Certificates', href: '/masters/certificates', icon: FileText },

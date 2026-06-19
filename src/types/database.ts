@@ -119,10 +119,23 @@ export interface Project {
   start_date: string | null;
   end_date: string | null;
   location: string | null;
+  district: string | null;
+  state: string | null;
   is_active: boolean;
   year?: Year;
   csr_partner?: CsrPartner;
   organisation?: Organisation;
+}
+
+export type ResourceCategoryType = 'material' | 'service';
+
+export interface ResourceCategory {
+  id: string;
+  name: string;
+  code: string | null;
+  category_type: ResourceCategoryType;
+  description: string | null;
+  is_active: boolean;
 }
 
 export interface ProjectArea {
@@ -153,7 +166,7 @@ export interface ResourceMaterial {
   code: string | null;
   description: string | null;
   unit_of_measurement: string;
-  category: string | null;
+  category_id: string | null;
   is_tree_species: boolean;
   is_active: boolean;
 }

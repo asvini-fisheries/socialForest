@@ -40,7 +40,7 @@ const EXPECTED_TABLES = [
   'contractor_expense_attachments', 'contractor_employee_reports', 'tree_census_updates',
   'tree_census_images', 'contractor_tools_stock', 'tools_stock_transactions',
   'nursery_inwards', 'nursery_issues', 'whatsapp_notifications', 'esg_report_schedules',
-  'esg_report_history', 'designations', 'certificates',
+  'esg_report_history', 'designations', 'certificates', 'resource_categories',
 ];
 
 const EXPECTED_BUCKETS = [
@@ -84,6 +84,7 @@ async function validate() {
     { table: 'years', min: 3 },
     { table: 'activities', min: 12 },
     { table: 'resources_materials', min: 13 },
+    { table: 'resource_categories', min: 7 },
     { table: 'stakeholder_categories', min: 6 },
     { table: 'designations', min: 8 },
     { table: 'certificates', min: 7 },

@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { createClient } from '@/lib/supabase/client';
-import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
+import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
+import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
 import type { Project, ProjectArea } from '@/types/database';
 import {
@@ -15,59 +15,63 @@ import {
   TreePine,
   MapPin,
   IndianRupee,
-  Building2,
   Handshake,
   Calendar,
   Loader2,
   Layers,
+  Pencil,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [project, setProject] = useState<Project | null>(null);
   const [areas, setAreas] = useState<ProjectArea[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
 
-  useEffect(() => {
+  const loadProject = useCallback(async () => {
     if (!id) return;
+    setLoading(true);
+    setError('');
+    const supabase = createClient();
 
-    async function load() {
-      setLoading(true);
-      setError('');
-      const supabase = createClient();
+    const [projectRes, areasRes] = await Promise.all([
+      supabase
+        .from('projects')
+        .select(
+          '*, year:years(year_label), csr_partner:csr_partners(name, code), organisation:organisations(name, code)'
+        )
+        .eq('id', id)
+        .single(),
+      supabase
+        .from('project_areas')
+        .select('*')
+        .eq('project_id', id)
+        .eq('is_active', true)
+        .order('level')
+        .order('name'),
+    ]);
 
-      const [projectRes, areasRes] = await Promise.all([
-        supabase
-          .from('projects')
-          .select(
-            '*, year:years(year_label), csr_partner:csr_partners(name, code), organisation:organisations(name, code)'
-          )
-          .eq('id', id)
-          .single(),
-        supabase
-          .from('project_areas')
-          .select('*')
-          .eq('project_id', id)
-          .eq('is_active', true)
-          .order('level')
-          .order('name'),
-      ]);
-
-      if (projectRes.error) {
-        setError(projectRes.error.message);
-        setLoading(false);
-        return;
-      }
-
-      setProject(projectRes.data as Project);
-      setAreas((areasRes.data as ProjectArea[]) || []);
+    if (projectRes.error) {
+      setError(projectRes.error.message);
       setLoading(false);
+      return;
     }
 
-    load();
+    setProject(projectRes.data as Project);
+    setAreas((areasRes.data as ProjectArea[]) || []);
+    setLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    loadProject();
+  }, [loadProject]);
 
   const areasByLevel = [1, 2, 3].map((level) => areas.filter((a) => a.level === level));
 
@@ -114,6 +118,12 @@ export default function ProjectDetailPage() {
                   <p className="text-gray-600 mt-2 max-w-2xl">{project.description}</p>
                 )}
               </div>
+              {isAdmin && (
+                <Button variant="outline" onClick={() => setEditOpen(true)}>
+                  <Pencil className="w-4 h-4" />
+                  Edit Project
+                </Button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -221,6 +231,15 @@ export default function ProjectDetailPage() {
           </>
         )}
       </div>
+
+      {project && (
+        <ProjectFormDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          project={project}
+          onSaved={loadProject}
+        />
+      )}
     </DashboardLayout>
   );
 }

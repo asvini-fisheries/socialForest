@@ -9,6 +9,7 @@ import {
   Package,
   ClipboardList,
   FileText,
+  Tags,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDate } from '@/lib/utils';
@@ -187,17 +188,65 @@ export const activitiesConfig: MasterConfig = {
   defaultValues: { is_active: true },
 };
 
+export const resourceCategoriesConfig: MasterConfig = {
+  title: 'Resource Categories',
+  table: 'resource_categories',
+  icon: Tags,
+  orderBy: 'name',
+  fields: [
+    { name: 'name', label: 'Category Name', type: 'text', required: true },
+    { name: 'code', label: 'Code', type: 'text' },
+    {
+      name: 'category_type',
+      label: 'Type',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 'material', label: 'Material' },
+        { value: 'service', label: 'Service' },
+      ],
+    },
+    { name: 'description', label: 'Description', type: 'textarea' },
+    { name: 'is_active', label: 'Active', type: 'boolean' },
+  ],
+  columns: [
+    { key: 'name', header: 'Name', render: (r) => String(r.name) },
+    { key: 'code', header: 'Code', render: (r) => String(r.code || '—') },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (r) => (
+        <span className="capitalize">{String(r.category_type)}</span>
+      ),
+    },
+    { key: 'active', header: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },
+  ],
+  defaultValues: { category_type: 'material', is_active: true },
+};
+
 export const resourcesConfig: MasterConfig = {
   title: 'Resources / Materials',
   table: 'resources_materials',
   icon: Package,
   orderBy: 'name',
+  selectQuery: '*, resource_category:resource_categories(name, category_type)',
   fields: [
     { name: 'name', label: 'Name', type: 'text', required: true },
     { name: 'code', label: 'Code', type: 'text' },
     { name: 'description', label: 'Description', type: 'textarea' },
     { name: 'unit_of_measurement', label: 'Unit', type: 'text', required: true },
-    { name: 'category', label: 'Category', type: 'text' },
+    {
+      name: 'category_id',
+      label: 'Resource Category',
+      type: 'select',
+      required: true,
+      optionsFrom: {
+        table: 'resource_categories',
+        valueKey: 'id',
+        labelKey: 'name',
+        labelSuffixKey: 'category_type',
+      },
+    },
     { name: 'is_tree_species', label: 'Tree Species', type: 'boolean' },
     { name: 'is_active', label: 'Active', type: 'boolean' },
   ],
@@ -205,7 +254,14 @@ export const resourcesConfig: MasterConfig = {
     { key: 'name', header: 'Name', render: (r) => String(r.name) },
     { key: 'code', header: 'Code', render: (r) => String(r.code || '—') },
     { key: 'unit', header: 'Unit', render: (r) => String(r.unit_of_measurement) },
-    { key: 'category', header: 'Category', render: (r) => String(r.category || '—') },
+    {
+      key: 'category',
+      header: 'Category',
+      render: (r) => {
+        const cat = r.resource_category as { name?: string; category_type?: string } | null;
+        return cat ? `${cat.name} (${cat.category_type})` : '—';
+      },
+    },
     { key: 'tree', header: 'Tree Species', render: (r) => (r.is_tree_species ? 'Yes' : 'No') },
   ],
   defaultValues: { is_active: true, is_tree_species: false },

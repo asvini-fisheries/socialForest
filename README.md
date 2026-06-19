@@ -50,6 +50,15 @@ Migration order:
 5. `005_auth_triggers.sql` — Auto-create user profile on OTP signup
 6. `006_demo_data.sql` — Sample CSR, org, project (optional)
 7. `007_fix_auth_trigger.sql` — Auth trigger fixes
+8. `008_email_login_index.sql` — Email login support
+9. `009_admin_master_crud_rls.sql` — Admin CRUD on master tables
+10. `010_resource_categories.sql` — Resource category master (material/service)
+
+Apply a single migration (requires `DATABASE_URL` in `.env.local`):
+
+```bash
+npm run apply:migration
+```
 
 ### 4. Enable Phone Auth in Supabase
 
