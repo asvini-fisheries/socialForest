@@ -63,7 +63,9 @@ In Supabase Dashboard → Authentication → Providers → Phone:
 npm run dev
 ```
 
-Open [http://localhost:3500](http://localhost:3500)
+Open [http://localhost:4350](http://localhost:4350)
+
+> Port `4350` is dedicated to SocialForest. See [docs/PORTS.md](docs/PORTS.md) for the full port registry.
 
 ---
 
