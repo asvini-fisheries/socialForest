@@ -12,10 +12,15 @@ import { Loader2, Plus, Trash2 } from 'lucide-react';
 
 type ResourceRow = { resource_id: string; quantity_used: string; unit_rate: string };
 
+type ActivityEntry = DailyActivityUpdate & {
+  project_activity?: { activity_id?: string; activity?: { name: string } };
+  resources_used?: { resource_id: string; quantity_used: number; unit_rate: number | null }[];
+};
+
 interface DailyActivityFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  entry?: DailyActivityUpdate | null;
+  entry?: ActivityEntry | null;
   onSaved: () => void;
 }
 
@@ -25,7 +30,7 @@ export function DailyActivityFormDialog({
   entry,
   onSaved,
 }: DailyActivityFormDialogProps) {
-  const { user, selectedProject } = useAuth();
+  const { selectedProject } = useAuth();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activities, setActivities] = useState<{ value: string; label: string }[]>([]);
@@ -78,7 +83,7 @@ export function DailyActivityFormDialog({
 
     if (entry) {
       setForm({
-        activity_id: '',
+        activity_id: entry.project_activity?.activity_id || '',
         stakeholder_id: entry.stakeholder_id,
         project_area_id: entry.project_area_id || '',
         activity_date: entry.activity_date,
@@ -111,34 +116,9 @@ export function DailyActivityFormDialog({
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function getOrCreateProjectActivity(activityId: string): Promise<string> {
-    const supabase = createClient();
-    const { data: existing } = await supabase
-      .from('project_activities')
-      .select('id')
-      .eq('project_id', selectedProject!.id)
-      .eq('activity_id', activityId)
-      .maybeSingle();
-
-    if (existing) return existing.id;
-
-    const { data: created, error: err } = await supabase
-      .from('project_activities')
-      .insert({
-        project_id: selectedProject!.id,
-        activity_id: activityId,
-        project_area_id: form.project_area_id || null,
-      })
-      .select('id')
-      .single();
-
-    if (err) throw new Error(err.message);
-    return created.id;
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !selectedProject) return;
+    if (!selectedProject) return;
     if (!form.activity_id && !entry) {
       setError('Select an activity');
       return;
@@ -152,75 +132,52 @@ export function DailyActivityFormDialog({
     setError('');
 
     try {
-      const supabase = createClient();
-      let projectActivityId = entry?.project_activity_id;
-
-      if (!entry) {
-        projectActivityId = await getOrCreateProjectActivity(form.activity_id);
+      let imagePath: string | undefined;
+      if (imageFile && selectedProject) {
+        const supabase = createClient();
+        const ext = imageFile.name.split('.').pop() || 'jpg';
+        imagePath = `${selectedProject.id}/pending/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('activity-images')
+          .upload(imagePath, imageFile, { upsert: false });
+        if (uploadErr) throw new Error(uploadErr.message);
       }
+
+      const resources_used = resourceRows
+        .filter((r) => r.resource_id && r.quantity_used)
+        .map((r) => ({
+          resource_id: r.resource_id,
+          quantity_used: Number(r.quantity_used),
+          unit_rate: r.unit_rate ? Number(r.unit_rate) : undefined,
+        }));
 
       const payload = {
         project_id: selectedProject.id,
-        project_activity_id: projectActivityId!,
+        activity_id: form.activity_id,
         stakeholder_id: form.stakeholder_id,
         project_area_id: form.project_area_id || null,
         activity_date: form.activity_date,
         quantity_completed: form.quantity_completed ? Number(form.quantity_completed) : null,
         remarks: form.remarks || null,
-        submitted_by: user.id,
+        resources_used,
+        image_path: imagePath,
+        image_caption: form.remarks || null,
       };
 
-      let activityId = entry?.id;
+      const res = entry
+        ? await fetch(`/api/daily-activities/${entry.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        : await fetch('/api/daily-activities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
 
-      if (entry) {
-        const { error: err } = await supabase
-          .from('daily_activity_updates')
-          .update(payload)
-          .eq('id', entry.id);
-        if (err) throw new Error(err.message);
-        activityId = entry.id;
-
-        await supabase.from('daily_activity_resources_used').delete().eq('daily_activity_id', entry.id);
-      } else {
-        const { data: created, error: err } = await supabase
-          .from('daily_activity_updates')
-          .insert(payload)
-          .select('id')
-          .single();
-        if (err) throw new Error(err.message);
-        activityId = created.id;
-      }
-
-      if (resourceRows.length > 0 && activityId) {
-        const rows = resourceRows
-          .filter((r) => r.resource_id && r.quantity_used)
-          .map((r) => ({
-            daily_activity_id: activityId!,
-            resource_id: r.resource_id,
-            quantity_used: Number(r.quantity_used),
-            unit_rate: r.unit_rate ? Number(r.unit_rate) : null,
-          }));
-        if (rows.length > 0) {
-          const { error: resErr } = await supabase.from('daily_activity_resources_used').insert(rows);
-          if (resErr) throw new Error(resErr.message);
-        }
-      }
-
-      if (imageFile && activityId) {
-        const ext = imageFile.name.split('.').pop() || 'jpg';
-        const filePath = `${selectedProject.id}/${activityId}/${Date.now()}.${ext}`;
-        const { error: uploadErr } = await supabase.storage
-          .from('activity-images')
-          .upload(filePath, imageFile, { upsert: false });
-        if (uploadErr) throw new Error(uploadErr.message);
-
-        const { error: imgErr } = await supabase.from('daily_activity_images').insert({
-          daily_activity_id: activityId,
-          image_url: filePath,
-          caption: form.remarks || null,
-        });
-        if (imgErr) throw new Error(imgErr.message);
-      }
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to save entry');
 
       onSaved();
       onOpenChange(false);
@@ -249,6 +206,14 @@ export function DailyActivityFormDialog({
                 placeholder="Select activity"
                 required
               />
+            )}
+            {entry && (
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-gray-700">Activity</label>
+                <p className="text-sm text-gray-900 py-2">
+                  {entry.project_activity?.activity?.name || '—'}
+                </p>
+              </div>
             )}
             <Select
               label="Stakeholder / Contractor"

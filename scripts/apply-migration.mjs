@@ -33,11 +33,22 @@ async function applyFile(client, filePath) {
   console.log(`  OK`);
 }
 
+function getDatabaseUrl() {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  const password = process.env.SUPABASE_DB_PASSWORD;
+  if (password) {
+    const ref = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1] || 'spdwkacfkzokoausdnkp';
+    return `postgresql://postgres.${ref}:${encodeURIComponent(password)}@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres`;
+  }
+  return null;
+}
+
 async function main() {
   loadEnv();
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = getDatabaseUrl();
   if (!databaseUrl) {
-    console.error('Set DATABASE_URL in .env.local (Supabase → Settings → Database → URI)');
+    console.error('Set DATABASE_URL or SUPABASE_DB_PASSWORD in .env.local');
+    console.error('(Supabase → Settings → Database → connection URI or password)');
     process.exit(1);
   }
 

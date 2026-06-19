@@ -20,7 +20,13 @@ type ActivityEntry = DailyActivityUpdate & {
   stakeholder?: { name: string };
   project_area?: { name: string } | null;
   images?: { id: string; image_url: string }[];
-  resources_used?: { id: string; resource_id: string; quantity_used: number; unit_rate: number | null }[];
+  resources_used?: {
+    id: string;
+    resource_id: string;
+    quantity_used: number;
+    unit_rate: number | null;
+    resource?: { name: string };
+  }[];
 };
 
 export default function DailyActivitiesPage() {
@@ -37,33 +43,15 @@ export default function DailyActivitiesPage() {
     if (!selectedProject) return;
     setLoading(true);
     setError('');
-    const supabase = createClient();
 
-    const { data, error: err } = await supabase
-      .from('daily_activity_updates')
-      .select(
-        `*,
-        project_activity:project_activities(activity_id, activity:activities(name)),
-        stakeholder:stakeholders(name),
-        project_area:project_areas(name),
-        images:daily_activity_images(id, image_url),
-        resources_used:daily_activity_resources_used(id, resource_id, quantity_used, unit_rate, resource:resources_materials(name))`
-      )
-      .eq('project_id', selectedProject.id)
-      .order('activity_date', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (err) {
-      if (err.message.includes('policy') || err.code === '42501') {
-        setError(
-          'Database permissions not set up. Run migration 011_daily_activities_policies.sql in Supabase SQL Editor.'
-        );
-      } else {
-        setError(err.message);
-      }
+    try {
+      const res = await fetch(`/api/daily-activities?project_id=${selectedProject.id}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to load entries');
+      setEntries(json.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load entries');
       setEntries([]);
-    } else {
-      setEntries((data as ActivityEntry[]) || []);
     }
     setLoading(false);
   }, [selectedProject]);
@@ -87,10 +75,13 @@ export default function DailyActivitiesPage() {
   }
 
   async function handleDelete(entry: ActivityEntry) {
-    if (!confirm('Delete this activity entry?')) return;
-    const supabase = createClient();
-    const { error: err } = await supabase.from('daily_activity_updates').delete().eq('id', entry.id);
-    if (err) setError(err.message);
+    if (!selectedProject || !confirm('Delete this activity entry?')) return;
+    const res = await fetch(
+      `/api/daily-activities/${entry.id}?project_id=${selectedProject.id}`,
+      { method: 'DELETE' }
+    );
+    const json = await res.json();
+    if (!res.ok) setError(json.error || 'Delete failed');
     else await loadEntries();
   }
 
@@ -208,7 +199,8 @@ export default function DailyActivitiesPage() {
                         )}
                         {(entry.resources_used?.length || 0) > 0 && (
                           <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
-                            {entry.resources_used!.length} resource{entry.resources_used!.length !== 1 ? 's' : ''}
+                            {entry.resources_used!.length} resource
+                            {entry.resources_used!.length !== 1 ? 's' : ''}
                           </span>
                         )}
                       </div>
