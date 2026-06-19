@@ -30,6 +30,14 @@ async function getOrCreateProjectActivity(
   activityId: string,
   projectAreaId?: string | null
 ) {
+  const { data: rpcId, error: rpcErr } = await service.rpc('get_or_create_project_activity', {
+    p_project_id: projectId,
+    p_activity_id: activityId,
+    p_project_area_id: projectAreaId || null,
+  });
+
+  if (!rpcErr && rpcId) return rpcId as string;
+
   const { data: existing } = await service
     .from('project_activities')
     .select('id')
@@ -80,7 +88,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const service = getServiceClient();
+  let service;
+  try {
+    service = getServiceClient();
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Server configuration error' },
+      { status: 500 }
+    );
+  }
 
   try {
     const projectActivityId = await getOrCreateProjectActivity(

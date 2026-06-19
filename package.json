@@ -13,6 +13,7 @@
     "validate:db": "node scripts/validate-db.mjs",
     "apply:migration": "node scripts/apply-migration.mjs supabase/migrations/010_resource_categories.sql",
     "apply:migration:011": "node scripts/apply-migration-011.mjs",
+    "setup:daily-activities": "node scripts/setup-daily-activities.mjs",
     "create:admin": "node scripts/create-admin.mjs"
   },
   "dependencies": {

@@ -2,9 +2,23 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 
 export function getServiceClient() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!key) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY is missing from server .env.local — add it from Supabase → Settings → API → service_role'
+    );
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64').toString());
+    if (payload.role !== 'service_role') {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY must be the service_role secret, not the anon key');
+    }
+  } catch {
+    // ignore decode errors for non-JWT keys
+  }
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    key,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
