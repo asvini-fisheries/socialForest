@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Logo } from '@/components/brand/logo';
 import {
   TreePine,
   LayoutDashboard,
@@ -93,15 +94,8 @@ export function Sidebar() {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center">
-            <TreePine className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h2 className="font-bold text-gray-900">SocialForest</h2>
-            <p className="text-xs text-gray-500">{selectedYear?.year_label}</p>
-          </div>
-        </div>
+        <Logo size="sm" className="w-full max-w-[160px]" />
+        <p className="text-xs text-gray-500 mt-2">{selectedYear?.year_label}</p>
         {selectedProject && (
           <div className="mt-3 p-2 bg-emerald-50 rounded-lg">
             <p className="text-xs text-emerald-700 font-medium truncate">{selectedProject.name}</p>

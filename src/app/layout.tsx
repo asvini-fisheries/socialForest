@@ -10,13 +10,17 @@ export const metadata: Metadata = {
   description:
     'Comprehensive CSR agroforestry project management platform with stakeholder tracking, daily activities, billing, and ESG reporting.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/socialforest-icon.png',
+    apple: '/icon-192.png',
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#059669',
+  themeColor: '#1B5E20',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

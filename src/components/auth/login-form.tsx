@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { TreePine, Phone, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { Phone, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -221,11 +222,8 @@ export function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 text-white mb-4">
-            <TreePine className="w-8 h-8" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">SocialForest</h1>
-          <p className="text-gray-500 mt-1">CSR Agroforestry Management</p>
+          <Logo size="xl" className="mx-auto" priority />
+          <p className="text-gray-500 mt-4 text-sm">CSR Agroforestry Management</p>
         </div>
 
         <Card>
