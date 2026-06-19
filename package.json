@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "validate:db": "node scripts/validate-db.mjs",
+    "create:admin": "node scripts/create-admin.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

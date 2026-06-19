@@ -32,19 +32,30 @@ Required variables:
 
 ### 3. Run Database Migrations
 
-Apply the SQL migrations in order via the Supabase SQL Editor or CLI:
+Migrations are in `supabase/migrations/`. Apply via Supabase SQL Editor, CLI, or:
 
+```bash
+# Validate after setup
+npm run validate:db
+
+# Create admin user (after migrations)
+npm run create:admin 9876543210 "Your Name"
 ```
-supabase/migrations/001_initial_schema.sql   — All tables, enums, indexes
-supabase/migrations/002_rls_policies.sql     — Row-level security policies
-supabase/migrations/003_seed_data.sql        — Master data seed
-```
+
+Migration order:
+1. `001_initial_schema.sql` — 45 tables, 11 enums
+2. `002_rls_policies.sql` — Row-level security
+3. `003_seed_data.sql` — Master data seed
+4. `004_storage_buckets.sql` — 8 storage buckets
+5. `005_auth_triggers.sql` — Auto-create user profile on OTP signup
+6. `006_demo_data.sql` — Sample CSR, org, project (optional)
+7. `007_fix_auth_trigger.sql` — Auth trigger fixes
 
 ### 4. Enable Phone Auth in Supabase
 
 In Supabase Dashboard → Authentication → Providers → Phone:
 - Enable phone provider
-- Configure SMS provider (Twilio recommended for India +91)
+- Configure **Twilio** credentials (Account SID, Auth Token, Message Service SID) for India +91 OTP delivery
 
 ### 5. Start Development Server
 
