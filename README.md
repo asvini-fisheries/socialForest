@@ -63,7 +63,7 @@ In Supabase Dashboard → Authentication → Providers → Phone:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3500](http://localhost:3500)
 
 ---
 
