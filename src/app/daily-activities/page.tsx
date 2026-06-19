@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DailyActivityFormDialog } from '@/components/daily-activities/daily-activity-form-dialog';
 import { useAuth } from '@/contexts/auth-context';
-import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatNumber } from '@/lib/utils';
 import type { DailyActivityUpdate } from '@/types/database';
 import { Plus, Activity, Camera, Package, Loader2, Pencil, Trash2 } from 'lucide-react';
