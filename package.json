@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/run-server.mjs dev",
+    "dev": "node scripts/run-server.mjs dev --webpack",
+    "dev:turbo": "node scripts/run-server.mjs dev",
     "dev:webpack": "node scripts/run-server.mjs dev --webpack",
     "build": "next build",
     "start": "node scripts/run-server.mjs start",
