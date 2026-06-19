@@ -7,35 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
-
-function loadEnv() {
-  const envPath = resolve(process.cwd(), '.env.local');
-  if (!existsSync(envPath)) {
-    console.error('Missing .env.local');
-    process.exit(1);
-  }
-  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq);
-    const val = trimmed.slice(eq + 1);
-    if (!process.env[key]) process.env[key] = val;
-  }
-}
-
-function getDatabaseUrl() {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const password = process.env.SUPABASE_DB_PASSWORD;
-  if (password) {
-    const ref =
-      process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)/)?.[1] ||
-      'spdwkacfkzokoausdnkp';
-    return `postgresql://postgres.${ref}:${encodeURIComponent(password)}@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres`;
-  }
-  return null;
-}
+import { loadEnv, getDatabaseUrl } from './load-env.mjs';
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -100,19 +72,41 @@ async function seedProjectActivities() {
   console.log(`PASS  Pre-seeded ${created} project_activities links`);
 }
 
+async function verifyRpc() {
+  const supabase = getServiceClient();
+  const { data: proj } = await supabase.from('projects').select('id').limit(1).single();
+  const { data: act } = await supabase.from('activities').select('id').limit(1).single();
+  if (!proj || !act) return;
+
+  const { data, error } = await supabase.rpc('get_or_create_project_activity', {
+    p_project_id: proj.id,
+    p_activity_id: act.id,
+    p_project_area_id: null,
+  });
+  if (error) {
+    console.log('WARN  RPC function not available:', error.message);
+  } else {
+    console.log('PASS  get_or_create_project_activity RPC works');
+  }
+}
+
 async function main() {
   loadEnv();
+  if (!getDatabaseUrl()) {
+    console.error('Missing DATABASE_URL or SUPABASE_DB_PASSWORD');
+    console.error('Add to .env.local (not .enc.local): SUPABASE_DB_PASSWORD=your_password');
+    process.exit(1);
+  }
   console.log('Setting up Daily Activities...\n');
 
   const sqlApplied = await applySqlMigration();
   if (sqlApplied) {
-    console.log('PASS  SQL migrations applied (RLS + RPC function)\n');
-  } else {
-    console.log('WARN  SQL not applied — add DATABASE_URL or SUPABASE_DB_PASSWORD to .env.local\n');
+    console.log('PASS  SQL migrations 011 + 012 applied\n');
+    await verifyRpc();
   }
 
   await seedProjectActivities();
-  console.log('\nDone.');
+  console.log('\nDone. Daily Activities is ready.');
 }
 
 main().catch((err) => {
