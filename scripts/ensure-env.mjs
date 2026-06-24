@@ -8,6 +8,7 @@ import { LOCAL_PROJECT_PATH_WINDOWS } from '../config/paths.mjs';
 
 const root = process.cwd();
 const envLocal = resolve(root, '.env.local');
+const envEncLocal = resolve(root, '.enc.local');
 const envExample = resolve(root, '.env.example');
 
 function parseEnvFile(filePath) {
@@ -33,6 +34,11 @@ function isPlaceholder(value) {
   );
 }
 
+if (!existsSync(envLocal) && existsSync(envEncLocal)) {
+  copyFileSync(envEncLocal, envLocal);
+  console.error('\nFound .enc.local (typo) — copied to .env.local for Next.js.\n');
+}
+
 if (!existsSync(envLocal)) {
   if (existsSync(envExample)) {
     copyFileSync(envExample, envLocal);
@@ -53,7 +59,10 @@ if (!existsSync(envLocal)) {
   process.exit(1);
 }
 
-const env = parseEnvFile(envLocal);
+const env = {
+  ...parseEnvFile(envEncLocal),
+  ...parseEnvFile(envLocal),
+};
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
