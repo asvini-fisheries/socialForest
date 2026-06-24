@@ -11,6 +11,16 @@ CSR Agroforestry Project Management Platform — track plantation projects, stak
 
 ## Getting Started
 
+### Local project path (Windows)
+
+Clone and work from this folder only:
+
+```
+D:\sak\ApplicationDevelopment\socialForest
+```
+
+Canonical path is defined in [`config/paths.mjs`](config/paths.mjs). Update that file if the folder moves.
+
 ### 1. Install Dependencies
 
 ```bash

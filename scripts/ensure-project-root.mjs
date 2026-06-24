@@ -4,6 +4,7 @@
  */
 import { existsSync } from 'fs';
 import path from 'path';
+import { LOCAL_PROJECT_PATH_WINDOWS } from '../config/paths.mjs';
 
 const root = process.cwd();
 const hasApp = existsSync(path.join(root, 'src', 'app')) || existsSync(path.join(root, 'app'));
@@ -15,8 +16,8 @@ if (!hasPkg || !hasApp) {
   console.error('\nRun commands from the socialForest folder that contains:');
   console.error('  package.json');
   console.error('  src/app/');
-  console.error('\nExample:');
-  console.error('  cd D:\\sak\\Asvini\\payoutstand-dashboard\\socialForest');
+  console.error('\nCanonical path (see config/paths.mjs):');
+  console.error(`  cd ${LOCAL_PROJECT_PATH_WINDOWS}`);
   console.error('  npm run dev\n');
   process.exit(1);
 }

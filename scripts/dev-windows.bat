@@ -5,7 +5,8 @@ cd /d "%~dp0.."
 if not exist "src\app" (
   echo.
   echo ERROR: src\app not found in %CD%
-  echo Run this from the socialForest folder after: git pull origin main
+  echo Run from: D:\sak\ApplicationDevelopment\socialForest
+  echo Then: git pull origin develop
   echo.
   pause
   exit /b 1
