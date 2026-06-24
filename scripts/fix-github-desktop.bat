@@ -4,7 +4,8 @@ cd /d "%~dp0.."
 
 echo.
 echo SocialForest — Git / GitHub Desktop fix
-echo Folder: %CD%
+echo Canonical path: D:\sak\ApplicationDevelopment\socialForest
+echo Current folder: %CD%
 echo.
 
 git rev-parse --show-toplevel >nul 2>&1

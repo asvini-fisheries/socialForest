@@ -1,16 +1,19 @@
 # GitHub Desktop — SocialForest
 
-Use this guide if GitHub Desktop shows fetch/pull errors, wrong branch, or nested-repo warnings.
+Use this guide if GitHub Desktop shows fetch/pull errors or wrong branch.
+
+> **Canonical local path:** `D:\sak\ApplicationDevelopment\socialForest`  
+> Defined in [`config/paths.mjs`](../config/paths.mjs) — update that file if the folder moves again.
 
 ## Correct local path
 
-Add **only** the SocialForest folder — not the parent `payoutstand-dashboard` folder:
+Add this folder in GitHub Desktop:
 
 ```
-D:\sak\Asvini\payoutstand-dashboard\socialForest
+D:\sak\ApplicationDevelopment\socialForest
 ```
 
-In GitHub Desktop: **File → Add local repository** → browse to `socialForest`.
+**File → Add local repository** → browse to `socialForest` under `ApplicationDevelopment`.
 
 ## Remote URL (canonical)
 
@@ -21,9 +24,16 @@ https://github.com/asvini-fisheries/socialForest.git
 If you see *"repository moved"*, update the remote:
 
 ```powershell
-cd D:\sak\Asvini\payoutstand-dashboard\socialForest
+cd D:\sak\ApplicationDevelopment\socialForest
 git remote set-url origin https://github.com/asvini-fisheries/socialForest.git
 git fetch origin
+```
+
+Or run:
+
+```powershell
+cd D:\sak\ApplicationDevelopment\socialForest
+scripts\fix-github-desktop.bat
 ```
 
 ## Branches
@@ -40,32 +50,23 @@ git fetch origin
 git checkout develop
 ```
 
-If `develop` does not exist locally:
+## Verify correct folder
 
 ```powershell
-git checkout -b develop origin/develop
-```
-
-## Nested repo warning
-
-If `payoutstand-dashboard` is also a Git repository, GitHub Desktop may open the **parent** repo instead of SocialForest.
-
-**Fix:** Remove the parent from GitHub Desktop, then add `socialForest` directly (path above).
-
-Or in PowerShell, confirm you are inside SocialForest:
-
-```powershell
-cd D:\sak\Asvini\payoutstand-dashboard\socialForest
+cd D:\sak\ApplicationDevelopment\socialForest
 git rev-parse --show-toplevel
 ```
 
-Expected output ends with `\socialForest`, not `\payoutstand-dashboard`.
+Expected output ends with `\socialForest`.
 
 ## Common errors
 
 ### "Couldn't find remote ref develop"
 
-Run `git fetch origin` then `git branch -r`. If `origin/develop` is missing, use `main` or ask the team to push `develop`.
+```powershell
+git fetch origin
+git checkout -b develop origin/develop
+```
 
 ### Pull / push authentication failed
 
@@ -73,12 +74,12 @@ GitHub Desktop → **File → Options → Accounts** → sign in again.
 
 ### Wrong folder / npm dev errors
 
-Always run `npm run dev` from inside `socialForest` (folder with `package.json` and `src/app`).
+Always run `npm run dev` from `D:\sak\ApplicationDevelopment\socialForest` (folder with `package.json` and `src/app`).
 
 ## Quick health check
 
 ```powershell
-cd D:\sak\Asvini\payoutstand-dashboard\socialForest
+cd D:\sak\ApplicationDevelopment\socialForest
 git status
 git remote -v
 git branch -vv
