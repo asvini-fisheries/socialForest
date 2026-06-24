@@ -1,22 +1,8 @@
-import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { getProjectRoot, loadProjectEnv } from '../config/load-env-files.mjs';
 
 /** Load .env.local and .enc.local (common typo) into process.env */
 export function loadEnv() {
-  const cwd = process.cwd();
-  for (const name of ['.env.local', '.enc.local']) {
-    const envPath = resolve(cwd, name);
-    if (!existsSync(envPath)) continue;
-    for (const line of readFileSync(envPath, 'utf8').split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eq = trimmed.indexOf('=');
-      if (eq === -1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      const val = trimmed.slice(eq + 1).trim();
-      if (!process.env[key]) process.env[key] = val;
-    }
-  }
+  loadProjectEnv(getProjectRoot());
 }
 
 export function getDatabaseUrl() {
