@@ -92,17 +92,18 @@ async function verifyRpc() {
 
 async function main() {
   loadEnv();
-  if (!getDatabaseUrl()) {
-    console.error('Missing DATABASE_URL or SUPABASE_DB_PASSWORD');
-    console.error('Add to .env.local (not .enc.local): SUPABASE_DB_PASSWORD=your_password');
-    process.exit(1);
-  }
+  const hasDbUrl = Boolean(getDatabaseUrl());
   console.log('Setting up Daily Activities...\n');
 
-  const sqlApplied = await applySqlMigration();
-  if (sqlApplied) {
-    console.log('PASS  SQL migrations 011 + 012 applied\n');
-    await verifyRpc();
+  if (!hasDbUrl) {
+    console.warn('WARN  Missing DATABASE_URL or SUPABASE_DB_PASSWORD — skipping SQL migrations');
+    console.warn('      Add to .env.local: SUPABASE_DB_PASSWORD=your_password\n');
+  } else {
+    const sqlApplied = await applySqlMigration();
+    if (sqlApplied) {
+      console.log('PASS  SQL migrations 011 + 012 applied\n');
+      await verifyRpc();
+    }
   }
 
   await seedProjectActivities();
