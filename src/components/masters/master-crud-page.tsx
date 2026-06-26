@@ -29,7 +29,6 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     () => config.searchKeys ?? tableSpec?.searchKeys ?? [],
     [config.searchKeys, tableSpec?.searchKeys]
   );
-  const importColumns = tableSpec?.importColumns ?? [];
   const importEnabled = tableSpec?.importEnabled ?? false;
 
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
@@ -279,7 +278,6 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
             search={search}
             onSearchChange={setSearch}
             importEnabled={importEnabled}
-            importColumns={importColumns}
             filteredRows={filteredRows}
             onImportComplete={loadRows}
             onOpenLogs={() => setLogsOpen(true)}

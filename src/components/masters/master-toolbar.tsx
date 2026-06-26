@@ -11,8 +11,6 @@ import {
   ClipboardList,
   Loader2,
 } from 'lucide-react';
-import { exportRowsBuffer, downloadBuffer } from '@/lib/master-excel';
-import type { ImportColumnSpec } from '@/lib/master-types';
 
 interface MasterToolbarProps {
   table: string;
@@ -20,14 +18,13 @@ interface MasterToolbarProps {
   search: string;
   onSearchChange: (value: string) => void;
   importEnabled: boolean;
-  importColumns: ImportColumnSpec[];
   filteredRows: Record<string, unknown>[];
   onImportComplete: () => void;
   onOpenLogs: () => void;
 }
 
-async function downloadFromApi(path: string, fallbackName: string) {
-  const res = await fetch(path);
+async function downloadFromApi(path: string, fallbackName: string, init?: RequestInit) {
+  const res = await fetch(path, init);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Download failed');
@@ -50,7 +47,6 @@ export function MasterToolbar({
   search,
   onSearchChange,
   importEnabled,
-  importColumns,
   filteredRows,
   onImportComplete,
   onOpenLogs,
@@ -63,12 +59,15 @@ export function MasterToolbar({
     setBusy('export');
     setMessage('');
     try {
-      if (importColumns.length) {
-        const buffer = exportRowsBuffer(title, importColumns, filteredRows);
-        downloadBuffer(buffer, `${title.replace(/\s+/g, '_')}_export.xlsx`);
-      } else {
-        await downloadFromApi(`/api/masters/${table}/export`, `${table}_export.xlsx`);
-      }
+      await downloadFromApi(
+        `/api/masters/${table}/export`,
+        `${table}_export.xlsx`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows: filteredRows }),
+        }
+      );
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Export failed');
     } finally {

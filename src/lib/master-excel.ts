@@ -1,3 +1,5 @@
+import 'server-only';
+
 import * as XLSX from 'xlsx';
 import type { ImportColumnSpec } from './master-types';
 
@@ -65,16 +67,4 @@ function formatExportCell(value: unknown, type: ImportColumnSpec['type']): strin
 export function parseBoolean(value: string): boolean {
   const v = value.trim().toLowerCase();
   return v === 'yes' || v === 'true' || v === '1' || v === 'y';
-}
-
-export function downloadBuffer(buffer: ArrayBuffer, filename: string) {
-  const blob = new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
