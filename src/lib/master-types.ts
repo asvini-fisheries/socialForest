@@ -54,4 +54,6 @@ export interface MasterConfig {
   defaultValues?: Record<string, unknown>;
   /** Fields used for client-side search (defaults to text fields) */
   searchKeys?: string[];
+  /** DB column for image (default: image_url, logo_url, or avatar_url per table) */
+  imageField?: string;
 }

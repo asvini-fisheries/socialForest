@@ -10,10 +10,13 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { DialogRoot, DialogContent } from '@/components/ui/dialog';
 import { MasterToolbar } from '@/components/masters/master-toolbar';
 import { ImportLogsDialog } from '@/components/masters/import-logs-dialog';
+import { MasterImageCell } from '@/components/masters/master-image-cell';
+import { MasterImageField } from '@/components/masters/master-image-field';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { getMasterTableSpec } from '@/lib/master-registry-data';
 import { filterMasterRows } from '@/lib/master-registry';
+import { getMasterImageField, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
 import type { MasterConfig, MasterField } from '@/lib/master-types';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -30,6 +33,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     [config.searchKeys, tableSpec?.searchKeys]
   );
   const importEnabled = tableSpec?.importEnabled ?? false;
+  const imageField = config.imageField ?? getMasterImageField(config.table);
 
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [search, setSearch] = useState('');
@@ -41,6 +45,26 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
   const [fieldOptions, setFieldOptions] = useState<Record<string, { value: string; label: string }[]>>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageClear, setImageClear] = useState(false);
+
+  const gridColumns = useMemo(
+    () => [
+      {
+        key: '_image',
+        header: 'Image',
+        render: (row: Record<string, unknown>) => (
+          <MasterImageCell
+            url={String(row[imageField] || '')}
+            alt={String(row.name || row.full_name || row.year_label || config.title)}
+          />
+        ),
+      },
+      ...config.columns,
+    ],
+    [config.columns, config.title, imageField]
+  );
 
   const filteredRows = useMemo(
     () => filterMasterRows(rows, search, searchKeys),
@@ -90,6 +114,12 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.table]);
 
+  function resetImageState() {
+    setImageFile(null);
+    setImagePreview(null);
+    setImageClear(false);
+  }
+
   function openCreate() {
     const defaults: Record<string, unknown> = { ...config.defaultValues };
     config.fields.forEach((f) => {
@@ -97,6 +127,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     });
     setEditing(null);
     setForm(defaults);
+    resetImageState();
     setDialogOpen(true);
   }
 
@@ -107,7 +138,56 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       values[f.name] = row[f.name] ?? (f.type === 'boolean' ? false : '');
     });
     setForm(values);
+    resetImageState();
     setDialogOpen(true);
+  }
+
+  function handleImageSelect(file: File | null) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5 MB');
+      return;
+    }
+    setImageFile(file);
+    setImageClear(false);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function handleImageClear() {
+    setImageFile(null);
+    setImagePreview(null);
+    setImageClear(true);
+  }
+
+  async function saveImageForRecord(recordId: string, payload: Record<string, unknown>) {
+    if (!imageFile && !imageClear) return;
+
+    let imageUrl: string | null = imageClear
+      ? null
+      : String(editing?.[imageField] || payload[imageField] || '');
+
+    if (imageFile) {
+      const previous = editing?.[imageField] ? String(editing[imageField]) : '';
+      if (previous) await removeMasterImageFromUrl(previous).catch(() => {});
+      imageUrl = await uploadMasterImage(config.table, recordId, imageFile);
+    }
+
+    if (config.apiRoute) {
+      const res = await fetch(config.apiRoute, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: recordId, ...payload, [imageField]: imageUrl }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Image save failed');
+    } else {
+      const supabase = createClient();
+      const { error: err } = await supabase
+        .from(config.table)
+        .update({ [imageField]: imageUrl })
+        .eq('id', recordId);
+      if (err) throw err;
+    }
   }
 
   function updateField(name: string, value: unknown) {
@@ -130,6 +210,8 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     });
 
     try {
+      let recordId = editing?.id as string | undefined;
+
       if (config.apiRoute) {
         const res = await fetch(config.apiRoute, {
           method: editing ? 'PUT' : 'POST',
@@ -138,6 +220,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
         });
         const result = await res.json();
         if (!res.ok) throw new Error(result.error || 'Save failed');
+        recordId = editing ? (editing.id as string) : (result.id as string);
       } else {
         const supabase = createClient();
         if (editing) {
@@ -146,12 +229,24 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
             .update(payload)
             .eq('id', editing.id as string);
           if (err) throw err;
+          recordId = editing.id as string;
         } else {
-          const { error: err } = await supabase.from(config.table).insert(payload);
+          const { data, error: err } = await supabase
+            .from(config.table)
+            .insert(payload)
+            .select('id')
+            .single();
           if (err) throw err;
+          recordId = data.id as string;
         }
       }
+
+      if (recordId && (imageFile || imageClear)) {
+        await saveImageForRecord(recordId, payload);
+      }
+
       setDialogOpen(false);
+      resetImageState();
       await loadRows();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
@@ -321,7 +416,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      {config.columns.map((col) => (
+                      {gridColumns.map((col) => (
                         <th key={col.key} className="text-left py-3 px-4 font-medium text-gray-500">
                           {col.header}
                         </th>
@@ -334,7 +429,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
                   <tbody>
                     {filteredRows.map((row) => (
                       <tr key={row.id as string} className="border-b border-gray-100 hover:bg-gray-50">
-                        {config.columns.map((col) => (
+                        {gridColumns.map((col) => (
                           <td key={col.key} className="py-3 px-4 text-gray-700">
                             {col.render(row)}
                           </td>
@@ -376,6 +471,12 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       <DialogRoot open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent title={editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}>
           <form onSubmit={handleSave} className="space-y-4">
+            <MasterImageField
+              currentUrl={imageClear ? null : String(editing?.[imageField] || '')}
+              previewUrl={imagePreview}
+              onFileSelect={handleImageSelect}
+              onClear={handleImageClear}
+            />
             {config.fields.map(renderField)}
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

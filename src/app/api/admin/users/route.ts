@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { full_name, mobile, email, role, status } = body;
+  const { full_name, mobile, email, role, status, avatar_url } = body;
 
   if (!full_name || !mobile || !role) {
     return NextResponse.json({ error: 'Name, mobile, and role are required' }, { status: 400 });
@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
     full_name,
     role,
     status: status || 'active',
+    avatar_url: avatar_url || null,
   });
 
   if (profileErr) {
@@ -74,7 +75,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { id, full_name, mobile, email, role, status } = body;
+  const { id, full_name, mobile, email, role, status, avatar_url } = body;
 
   if (!id) return NextResponse.json({ error: 'User ID required' }, { status: 400 });
 
@@ -82,7 +83,7 @@ export async function PUT(request: NextRequest) {
 
   const { error: profileErr } = await service
     .from('users')
-    .update({ full_name, mobile, email, role, status })
+    .update({ full_name, mobile, email, role, status, avatar_url: avatar_url ?? null })
     .eq('id', id);
 
   if (profileErr) {
