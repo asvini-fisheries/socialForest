@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DialogRoot, DialogContent } from '@/components/ui/dialog';
+import { MasterToolbar } from '@/components/masters/master-toolbar';
+import { ImportLogsDialog } from '@/components/masters/import-logs-dialog';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
+import { getMasterTableSpec } from '@/lib/master-registry-data';
+import { filterMasterRows } from '@/lib/master-registry';
 import type { MasterConfig, MasterField } from '@/lib/master-types';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -20,7 +24,17 @@ interface MasterCrudPageProps {
 export function MasterCrudPage({ config }: MasterCrudPageProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const tableSpec = getMasterTableSpec(config.table);
+  const searchKeys = useMemo(
+    () => config.searchKeys ?? tableSpec?.searchKeys ?? [],
+    [config.searchKeys, tableSpec?.searchKeys]
+  );
+  const importColumns = tableSpec?.importColumns ?? [];
+  const importEnabled = tableSpec?.importEnabled ?? false;
+
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [search, setSearch] = useState('');
+  const [logsOpen, setLogsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -28,6 +42,11 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
   const [fieldOptions, setFieldOptions] = useState<Record<string, { value: string; label: string }[]>>({});
+
+  const filteredRows = useMemo(
+    () => filterMasterRows(rows, search, searchKeys),
+    [rows, search, searchKeys]
+  );
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -238,7 +257,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{config.title}</h1>
             <p className="text-gray-500 mt-1">
-              {isAdmin ? 'Add, edit, and delete master records' : 'View master data (read only)'}
+              {isAdmin ? 'Search, import/export, and manage master records' : 'View master data (read only)'}
             </p>
           </div>
           {isAdmin && (
@@ -253,12 +272,39 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
           <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>
         )}
 
+        {isAdmin && (
+          <MasterToolbar
+            table={config.table}
+            title={config.title}
+            search={search}
+            onSearchChange={setSearch}
+            importEnabled={importEnabled}
+            importColumns={importColumns}
+            filteredRows={filteredRows}
+            onImportComplete={loadRows}
+            onOpenLogs={() => setLogsOpen(true)}
+          />
+        )}
+
+        {!isAdmin && (
+          <div className="relative max-w-md">
+            <Input
+              placeholder={`Search ${config.title.toLowerCase()}...`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Icon className="w-5 h-5 text-emerald-600" />
               {config.title}
-              <span className="text-sm font-normal text-gray-400 ml-2">({rows.length})</span>
+              <span className="text-sm font-normal text-gray-400 ml-2">
+                ({filteredRows.length}
+                {search ? ` of ${rows.length}` : ''})
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -267,8 +313,11 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 Loading...
               </div>
-            ) : rows.length === 0 ? (
-              <EmptyState icon={Icon} title={`No ${config.title.toLowerCase()} found`} />
+            ) : filteredRows.length === 0 ? (
+              <EmptyState
+                icon={Icon}
+                title={search ? 'No matching records' : `No ${config.title.toLowerCase()} found`}
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -285,7 +334,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row) => (
+                    {filteredRows.map((row) => (
                       <tr key={row.id as string} className="border-b border-gray-100 hover:bg-gray-50">
                         {config.columns.map((col) => (
                           <td key={col.key} className="py-3 px-4 text-gray-700">
@@ -318,6 +367,13 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <ImportLogsDialog
+        table={config.table}
+        title={config.title}
+        open={logsOpen}
+        onOpenChange={setLogsOpen}
+      />
 
       <DialogRoot open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent title={editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}>

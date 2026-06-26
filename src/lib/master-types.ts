@@ -25,6 +25,20 @@ export interface MasterColumn<T> {
   render: (row: T) => ReactNode;
 }
 
+export interface ImportColumnSpec {
+  key: string;
+  header: string;
+  required?: boolean;
+  type: FieldType;
+  resolveFrom?: {
+    table: string;
+    valueKey: string;
+    labelKey: string;
+    labelSuffixKey?: string;
+  };
+  options?: { value: string; label: string }[];
+}
+
 export interface MasterConfig {
   title: string;
   table: string;
@@ -38,4 +52,6 @@ export interface MasterConfig {
   /** Soft delete via is_active */
   softDelete?: boolean;
   defaultValues?: Record<string, unknown>;
+  /** Fields used for client-side search (defaults to text fields) */
+  searchKeys?: string[];
 }
