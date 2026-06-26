@@ -1,0 +1,166 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ImportColumnSpec } from '@/lib/master-types';
+import type { MasterTableSpec } from '@/lib/master-registry-data';
+import { parseBoolean } from '@/lib/master-excel';
+
+export interface ImportRowError {
+  row: number;
+  column: string;
+  value: string;
+  message: string;
+}
+
+export interface ImportResult {
+  totalRows: number;
+  successCount: number;
+  errorCount: number;
+  errors: ImportRowError[];
+}
+
+const lookupCache = new Map<string, Map<string, string>>();
+
+async function getLookupMap(
+  service: SupabaseClient,
+  spec: NonNullable<ImportColumnSpec['resolveFrom']>
+): Promise<Map<string, string>> {
+  const cacheKey = `${spec.table}:${spec.labelKey}`;
+  if (lookupCache.has(cacheKey)) return lookupCache.get(cacheKey)!;
+
+  const { data } = await service.from(spec.table).select('*');
+  const map = new Map<string, string>();
+  for (const row of data || []) {
+    const r = row as Record<string, string>;
+    const label = spec.labelSuffixKey
+      ? `${r[spec.labelKey]} (${r[spec.labelSuffixKey]})`.toLowerCase()
+      : String(r[spec.labelKey]).toLowerCase();
+    map.set(label, r[spec.valueKey]);
+    map.set(String(r[spec.labelKey]).toLowerCase(), r[spec.valueKey]);
+  }
+  lookupCache.set(cacheKey, map);
+  return map;
+}
+
+function mapHeaderToKey(
+  row: Record<string, string>,
+  columns: ImportColumnSpec[]
+): Record<string, string> {
+  const headerMap = Object.fromEntries(columns.map((c) => [c.header.toLowerCase(), c.key]));
+  const mapped: Record<string, string> = {};
+  for (const [header, value] of Object.entries(row)) {
+    const key = headerMap[header.trim().toLowerCase()] ?? header;
+    mapped[key] = String(value ?? '').trim();
+  }
+  return mapped;
+}
+
+function isEmptyRow(values: Record<string, string>): boolean {
+  return Object.values(values).every((v) => !v.trim());
+}
+
+export async function importMasterRows(
+  service: SupabaseClient,
+  spec: MasterTableSpec,
+  rawRows: Record<string, string>[]
+): Promise<ImportResult> {
+  lookupCache.clear();
+  const errors: ImportRowError[] = [];
+  let successCount = 0;
+  const dataRows = rawRows.filter((r) => !isEmptyRow(mapHeaderToKey(r, spec.importColumns)));
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const excelRow = i + 2;
+    const mapped = mapHeaderToKey(dataRows[i], spec.importColumns);
+    const payload: Record<string, unknown> = {};
+    let rowValid = true;
+
+    for (const col of spec.importColumns) {
+      const raw = mapped[col.key] ?? '';
+
+      if (!raw && col.required) {
+        errors.push({
+          row: excelRow,
+          column: col.header,
+          value: raw,
+          message: `${col.header} is required`,
+        });
+        rowValid = false;
+        break;
+      }
+
+      if (!raw) {
+        if (col.type === 'boolean') payload[col.key] = true;
+        continue;
+      }
+
+      if (col.type === 'boolean') {
+        payload[col.key] = parseBoolean(raw);
+      } else if (col.type === 'number') {
+        const num = Number(raw);
+        if (Number.isNaN(num)) {
+          errors.push({
+            row: excelRow,
+            column: col.header,
+            value: raw,
+            message: 'Must be a number',
+          });
+          rowValid = false;
+          break;
+        }
+        payload[col.key] = num;
+      } else if (col.resolveFrom) {
+        const lookup = await getLookupMap(service, col.resolveFrom);
+        const id = lookup.get(raw.toLowerCase());
+        if (!id) {
+          errors.push({
+            row: excelRow,
+            column: col.header,
+            value: raw,
+            message: `No match found in ${col.resolveFrom.table}`,
+          });
+          rowValid = false;
+          break;
+        }
+        payload[col.key] = id;
+      } else if (col.options?.length) {
+        const match = col.options.find(
+          (o) =>
+            o.label.toLowerCase() === raw.toLowerCase() || o.value.toLowerCase() === raw.toLowerCase()
+        );
+        if (!match) {
+          errors.push({
+            row: excelRow,
+            column: col.header,
+            value: raw,
+            message: `Invalid value. Allowed: ${col.options.map((o) => o.label).join(', ')}`,
+          });
+          rowValid = false;
+          break;
+        }
+        payload[col.key] = match.value;
+      } else {
+        payload[col.key] = raw;
+      }
+    }
+
+    if (!rowValid) continue;
+
+    const { error } = await service.from(spec.table).insert(payload);
+    if (error) {
+      errors.push({
+        row: excelRow,
+        column: '—',
+        value: '',
+        message: error.message,
+      });
+    } else {
+      successCount++;
+    }
+  }
+
+  return {
+    totalRows: dataRows.length,
+    successCount,
+    errorCount: dataRows.length - successCount,
+    errors,
+  };
+}
