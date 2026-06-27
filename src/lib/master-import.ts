@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ImportColumnSpec, CompositeLookupSpec } from '@/lib/master-types';
 import type { MasterTableSpec } from '@/lib/master-registry-data';
-import { parseBoolean } from '@/lib/master-excel';
+import { parseBoolean } from '@/lib/parse-boolean';
 
 export interface ImportRowError {
   row: number;

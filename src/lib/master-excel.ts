@@ -2,6 +2,9 @@ import 'server-only';
 
 import * as XLSX from 'xlsx';
 import type { ImportColumnSpec } from './master-types';
+import { parseBoolean } from './parse-boolean';
+
+export { parseBoolean };
 
 export interface ImportRowError {
   row: number;
@@ -62,9 +65,4 @@ function formatExportCell(value: unknown, type: ImportColumnSpec['type']): strin
     return JSON.stringify(value);
   }
   return String(value);
-}
-
-export function parseBoolean(value: string): boolean {
-  const v = value.trim().toLowerCase();
-  return v === 'yes' || v === 'true' || v === '1' || v === 'y';
 }
