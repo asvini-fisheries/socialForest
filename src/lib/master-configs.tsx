@@ -10,10 +10,14 @@ import {
   ClipboardList,
   FileText,
   Tags,
+  FolderKanban,
+  MapPin,
+  UserCheck,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { ROLE_LABELS } from '@/types/database';
+import { formatProjectStatus } from '@/lib/projects';
 import type { MasterConfig } from '@/lib/master-types';
 
 const USER_ROLES = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -21,6 +25,20 @@ const USER_STATUSES = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
   { value: 'suspended', label: 'Suspended' },
+];
+
+const PROJECT_STATUS_OPTIONS = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'active', label: 'Active' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+const AREA_LEVEL_OPTIONS = [
+  { value: '1', label: 'Level 1 (Zone)' },
+  { value: '2', label: 'Level 2 (Block)' },
+  { value: '3', label: 'Level 3 (Plot)' },
 ];
 
 export const yearsConfig: MasterConfig = {
@@ -265,6 +283,281 @@ export const resourcesConfig: MasterConfig = {
     { key: 'tree', header: 'Tree Species', render: (r) => (r.is_tree_species ? 'Yes' : 'No') },
   ],
   defaultValues: { is_active: true, is_tree_species: false },
+};
+
+export const projectsConfig: MasterConfig = {
+  title: 'Projects',
+  table: 'projects',
+  icon: FolderKanban,
+  orderBy: 'name',
+  selectQuery: '*, year:years(year_label), csr_partner:csr_partners(name), organisation:organisations(name)',
+  searchKeys: ['name', 'code', 'location', 'district', 'state'],
+  fields: [
+    {
+      name: 'year_id',
+      label: 'Year',
+      type: 'select',
+      required: true,
+      optionsFrom: { table: 'years', valueKey: 'id', labelKey: 'year_label' },
+    },
+    {
+      name: 'csr_partner_id',
+      label: 'CSR Partner',
+      type: 'select',
+      required: true,
+      optionsFrom: { table: 'csr_partners', valueKey: 'id', labelKey: 'name' },
+    },
+    {
+      name: 'organisation_id',
+      label: 'Organisation',
+      type: 'select',
+      required: true,
+      optionsFrom: { table: 'organisations', valueKey: 'id', labelKey: 'name' },
+    },
+    { name: 'name', label: 'Project Name', type: 'text', required: true },
+    { name: 'code', label: 'Code', type: 'text' },
+    { name: 'description', label: 'Description', type: 'textarea' },
+    { name: 'total_land_area_acres', label: 'Total Land (acres)', type: 'number', required: true },
+    { name: 'total_trees_planned', label: 'Trees Planned', type: 'number', required: true },
+    { name: 'budget_amount', label: 'Budget', type: 'number' },
+    { name: 'status', label: 'Status', type: 'select', required: true, options: PROJECT_STATUS_OPTIONS },
+    { name: 'start_date', label: 'Start Date', type: 'date' },
+    { name: 'end_date', label: 'End Date', type: 'date' },
+    { name: 'location', label: 'Location', type: 'text' },
+    { name: 'district', label: 'District', type: 'text' },
+    { name: 'state', label: 'State', type: 'text' },
+    { name: 'is_active', label: 'Active', type: 'boolean' },
+  ],
+  columns: [
+    { key: 'name', header: 'Project', render: (r) => String(r.name) },
+    { key: 'code', header: 'Code', render: (r) => String(r.code || '—') },
+    {
+      key: 'year',
+      header: 'Year',
+      render: (r) => {
+        const year = r.year as { year_label?: string } | null;
+        return year?.year_label || '—';
+      },
+    },
+    {
+      key: 'csr',
+      header: 'CSR Partner',
+      render: (r) => {
+        const partner = r.csr_partner as { name?: string } | null;
+        return partner?.name || '—';
+      },
+    },
+    {
+      key: 'org',
+      header: 'Organisation',
+      render: (r) => {
+        const org = r.organisation as { name?: string } | null;
+        return org?.name || '—';
+      },
+    },
+    { key: 'status', header: 'Status', render: (r) => formatProjectStatus(String(r.status)) },
+    { key: 'active', header: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },
+  ],
+  defaultValues: { status: 'draft', total_land_area_acres: 0, total_trees_planned: 0, budget_amount: 0, is_active: true },
+};
+
+export const projectAreasConfig: MasterConfig = {
+  title: 'Project Areas',
+  table: 'project_areas',
+  icon: MapPin,
+  orderBy: 'level',
+  selectQuery:
+    '*, project:projects(name, code), parent_area:project_areas!parent_area_id(name, code)',
+  searchKeys: ['name', 'code', 'description'],
+  fields: [
+    {
+      name: 'project_id',
+      label: 'Project',
+      type: 'select',
+      required: true,
+      optionsFrom: { table: 'projects', valueKey: 'id', labelKey: 'name', labelSuffixKey: 'code' },
+    },
+    {
+      name: 'parent_area_id',
+      label: 'Parent Area',
+      type: 'select',
+      optionsFrom: { table: 'project_areas', valueKey: 'id', labelKey: 'name', labelSuffixKey: 'code' },
+    },
+    { name: 'level', label: 'Level', type: 'select', required: true, options: AREA_LEVEL_OPTIONS, coerceNumber: true },
+    { name: 'name', label: 'Area Name', type: 'text', required: true },
+    { name: 'code', label: 'Code', type: 'text' },
+    { name: 'land_area_acres', label: 'Land Area (acres)', type: 'number', required: true },
+    { name: 'trees_planned', label: 'Trees Planned', type: 'number', required: true },
+    { name: 'trees_planted', label: 'Trees Planted', type: 'number' },
+    { name: 'description', label: 'Description', type: 'textarea' },
+    { name: 'is_active', label: 'Active', type: 'boolean' },
+  ],
+  columns: [
+    {
+      key: 'project',
+      header: 'Project',
+      render: (r) => {
+        const project = r.project as { name?: string; code?: string } | null;
+        return project ? `${project.name}${project.code ? ` (${project.code})` : ''}` : '—';
+      },
+    },
+    { key: 'level', header: 'Level', render: (r) => String(r.level) },
+    { key: 'name', header: 'Area', render: (r) => String(r.name) },
+    { key: 'code', header: 'Code', render: (r) => String(r.code || '—') },
+    {
+      key: 'parent',
+      header: 'Parent',
+      render: (r) => {
+        const parent = r.parent_area as { name?: string; code?: string } | null;
+        return parent ? `${parent.name}${parent.code ? ` (${parent.code})` : ''}` : '—';
+      },
+    },
+    {
+      key: 'land',
+      header: 'Land (acres)',
+      render: (r) => formatNumber(Number(r.land_area_acres || 0)),
+    },
+    {
+      key: 'trees',
+      header: 'Trees',
+      render: (r) => `${formatNumber(Number(r.trees_planted || 0))} / ${formatNumber(Number(r.trees_planned || 0))}`,
+    },
+    { key: 'active', header: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },
+  ],
+  defaultValues: { level: 1, land_area_acres: 0, trees_planned: 0, trees_planted: 0, is_active: true },
+};
+
+export const projectActivitiesConfig: MasterConfig = {
+  title: 'Project Activities',
+  table: 'project_activities',
+  icon: Activity,
+  orderBy: 'planned_start_date',
+  selectQuery:
+    '*, project:projects(name, code), activity:activities(name, code), project_area:project_areas(name, code)',
+  searchKeys: ['planned_quantity'],
+  fields: [
+    {
+      name: 'project_id',
+      label: 'Project',
+      type: 'select',
+      required: true,
+      optionsFrom: { table: 'projects', valueKey: 'id', labelKey: 'name', labelSuffixKey: 'code' },
+    },
+    {
+      name: 'activity_id',
+      label: 'Activity',
+      type: 'select',
+      required: true,
+      optionsFrom: { table: 'activities', valueKey: 'id', labelKey: 'name', labelSuffixKey: 'code' },
+    },
+    {
+      name: 'project_area_id',
+      label: 'Project Area',
+      type: 'select',
+      optionsFrom: { table: 'project_areas', valueKey: 'id', labelKey: 'name', labelSuffixKey: 'code' },
+    },
+    { name: 'planned_quantity', label: 'Planned Quantity', type: 'number' },
+    { name: 'planned_start_date', label: 'Planned Start', type: 'date' },
+    { name: 'planned_end_date', label: 'Planned End', type: 'date' },
+    { name: 'budget_amount', label: 'Budget', type: 'number' },
+    { name: 'is_active', label: 'Active', type: 'boolean' },
+  ],
+  columns: [
+    {
+      key: 'project',
+      header: 'Project',
+      render: (r) => {
+        const project = r.project as { name?: string } | null;
+        return project?.name || '—';
+      },
+    },
+    {
+      key: 'activity',
+      header: 'Activity',
+      render: (r) => {
+        const activity = r.activity as { name?: string } | null;
+        return activity?.name || '—';
+      },
+    },
+    {
+      key: 'area',
+      header: 'Area',
+      render: (r) => {
+        const area = r.project_area as { name?: string } | null;
+        return area?.name || 'All areas';
+      },
+    },
+    {
+      key: 'qty',
+      header: 'Planned Qty',
+      render: (r) => (r.planned_quantity != null ? formatNumber(Number(r.planned_quantity)) : '—'),
+    },
+    {
+      key: 'dates',
+      header: 'Planned Period',
+      render: (r) => {
+        const start = r.planned_start_date ? formatDate(String(r.planned_start_date)) : '—';
+        const end = r.planned_end_date ? formatDate(String(r.planned_end_date)) : '—';
+        return `${start} → ${end}`;
+      },
+    },
+    {
+      key: 'budget',
+      header: 'Budget',
+      render: (r) => (r.budget_amount != null ? formatCurrency(Number(r.budget_amount)) : '—'),
+    },
+    { key: 'active', header: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },
+  ],
+  defaultValues: { is_active: true },
+};
+
+export const projectUserAccessConfig: MasterConfig = {
+  title: 'Project User Access',
+  table: 'project_user_access',
+  icon: UserCheck,
+  orderBy: 'created_at',
+  softDelete: false,
+  selectQuery: '*, project:projects(name, code), user:users(full_name, mobile, email)',
+  searchKeys: ['project', 'user'],
+  fields: [
+    {
+      name: 'project_id',
+      label: 'Project',
+      type: 'select',
+      required: true,
+      optionsFrom: { table: 'projects', valueKey: 'id', labelKey: 'name', labelSuffixKey: 'code' },
+    },
+    {
+      name: 'user_id',
+      label: 'User',
+      type: 'select',
+      required: true,
+      optionsFrom: { table: 'users', valueKey: 'id', labelKey: 'full_name', labelSuffixKey: 'mobile' },
+    },
+  ],
+  columns: [
+    {
+      key: 'project',
+      header: 'Project',
+      render: (r) => {
+        const project = r.project as { name?: string; code?: string } | null;
+        return project ? `${project.name}${project.code ? ` (${project.code})` : ''}` : '—';
+      },
+    },
+    {
+      key: 'user',
+      header: 'User',
+      render: (r) => {
+        const user = r.user as { full_name?: string; mobile?: string } | null;
+        return user ? `${user.full_name} (${user.mobile})` : '—';
+      },
+    },
+    {
+      key: 'created',
+      header: 'Granted',
+      render: (r) => (r.created_at ? formatDate(String(r.created_at)) : '—'),
+    },
+  ],
 };
 
 export const usersConfig: MasterConfig = {

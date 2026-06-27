@@ -203,7 +203,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     const payload: Record<string, unknown> = {};
     config.fields.forEach((f) => {
       let val = form[f.name];
-      if (f.type === 'number' && val !== '' && val != null) val = Number(val);
+      if ((f.type === 'number' || f.coerceNumber) && val !== '' && val != null) val = Number(val);
       if (f.type === 'boolean') val = Boolean(val);
       if (val === '') val = null;
       payload[f.name] = val;

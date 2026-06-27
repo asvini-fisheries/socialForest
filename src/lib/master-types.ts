@@ -17,6 +17,8 @@ export interface MasterField {
     labelKey: string;
     labelSuffixKey?: string;
   };
+  /** Coerce value to number on save (e.g. numeric select) */
+  coerceNumber?: boolean;
 }
 
 export interface MasterColumn<T> {

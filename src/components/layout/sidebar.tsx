@@ -24,6 +24,8 @@ import {
   ClipboardList,
   Wrench,
   Tags,
+  MapPin,
+  UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
@@ -63,6 +65,10 @@ const MASTER_SUB_ITEMS = [
   { label: 'Organisations', href: '/masters/organisations', icon: Building2 },
   { label: 'Stakeholders', href: '/masters/stakeholders', icon: Users },
   { label: 'Activities', href: '/masters/activities', icon: Activity },
+  { label: 'Projects', href: '/masters/projects', icon: FolderKanban },
+  { label: 'Project Areas', href: '/masters/project-areas', icon: MapPin },
+  { label: 'Project Activities', href: '/masters/project-activities', icon: Activity },
+  { label: 'Project User Access', href: '/masters/project-user-access', icon: UserCheck },
   { label: 'Resource Categories', href: '/masters/resource-categories', icon: Tags },
   { label: 'Resources', href: '/masters/resources', icon: Package },
   { label: 'Designations', href: '/masters/designations', icon: ClipboardList },

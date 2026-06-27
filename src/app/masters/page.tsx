@@ -2,7 +2,7 @@
 
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Building2, Handshake, Activity, Package, Calendar, Award, Briefcase, Tags } from 'lucide-react';
+import { Users, Building2, Handshake, Activity, Package, Calendar, Award, Briefcase, Tags, FolderKanban, MapPin, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 
 const MASTER_MODULES = [
@@ -12,6 +12,10 @@ const MASTER_MODULES = [
   { title: 'Organisations', description: 'Executing organisations with contacts & certificates', href: '/masters/organisations', icon: Building2, count: 0 },
   { title: 'Stakeholders', description: 'Contractors, suppliers, and service providers', href: '/masters/stakeholders', icon: Briefcase, count: 0 },
   { title: 'Activities', description: 'Project activity types master', href: '/masters/activities', icon: Activity, count: 12 },
+  { title: 'Projects', description: 'Year-wise CSR agroforestry projects', href: '/masters/projects', icon: FolderKanban, count: 0 },
+  { title: 'Project Areas', description: 'Zone, block, and plot hierarchy per project', href: '/masters/project-areas', icon: MapPin, count: 0 },
+  { title: 'Project Activities', description: 'Activities planned per project and area', href: '/masters/project-activities', icon: Activity, count: 0 },
+  { title: 'Project User Access', description: 'Grant users access to specific projects', href: '/masters/project-user-access', icon: UserCheck, count: 0 },
   { title: 'Resource Categories', description: 'Material or service categories for resources', href: '/masters/resource-categories', icon: Tags, count: 7 },
   { title: 'Resources', description: 'Materials, services, and tree species', href: '/masters/resources', icon: Package, count: 13 },
   { title: 'Designations', description: 'Employee designation master', href: '/masters/designations', icon: Users, count: 8 },
