@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ImportColumnSpec } from '@/lib/master-types';
+import type { ImportColumnSpec, CompositeLookupSpec } from '@/lib/master-types';
 import type { MasterTableSpec } from '@/lib/master-registry-data';
 import { parseBoolean } from '@/lib/master-excel';
 
@@ -55,6 +55,50 @@ function mapHeaderToKey(
 
 function isEmptyRow(values: Record<string, string>): boolean {
   return Object.values(values).every((v) => !v.trim());
+}
+
+async function resolveCompositeLookups(
+  service: SupabaseClient,
+  payload: Record<string, unknown>,
+  composites: CompositeLookupSpec[],
+  excelRow: number,
+  errors: ImportRowError[]
+): Promise<boolean> {
+  for (const composite of composites) {
+    const filters: Record<string, string> = {};
+
+    for (const part of composite.matchFields) {
+      const val = payload[part.importKey];
+      if (!val) {
+        errors.push({
+          row: excelRow,
+          column: part.importKey,
+          value: '',
+          message: 'Required for composite lookup',
+        });
+        return false;
+      }
+      filters[part.rowField] = String(val);
+    }
+
+    let query = service.from(composite.table).select('id');
+    for (const [field, value] of Object.entries(filters)) {
+      query = query.eq(field, value);
+    }
+    const { data, error } = await query.maybeSingle();
+    if (error || !data) {
+      errors.push({
+        row: excelRow,
+        column: composite.targetKey,
+        value: '',
+        message: error?.message || `No ${composite.table} row matches the given values`,
+      });
+      return false;
+    }
+    payload[composite.targetKey] = (data as { id: string }).id;
+  }
+
+  return true;
 }
 
 export async function importMasterRows(
@@ -140,9 +184,27 @@ export async function importMasterRows(
       } else {
         payload[col.key] = raw;
       }
+
+      if (col.importOnly) {
+        continue;
+      }
     }
 
     if (!rowValid) continue;
+
+    if (spec.compositeLookups?.length) {
+      const ok = await resolveCompositeLookups(
+        service,
+        payload,
+        spec.compositeLookups,
+        excelRow,
+        errors
+      );
+      if (!ok) continue;
+      for (const col of spec.importColumns) {
+        if (col.importOnly) delete payload[col.key];
+      }
+    }
 
     const { error } = await service.from(spec.table).insert(payload);
     if (error) {

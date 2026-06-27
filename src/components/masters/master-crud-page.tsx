@@ -94,17 +94,20 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       const opts: Record<string, { value: string; label: string }[]> = {};
       for (const field of config.fields) {
         if (field.optionsFrom) {
+          const from = field.optionsFrom;
           const { data } = await supabase
-            .from(field.optionsFrom.table)
-            .select('*')
-            .order(field.optionsFrom.labelKey);
+            .from(from.table)
+            .select(from.selectQuery || '*')
+            .order(from.labelKey);
           opts[field.name] =
             data?.map((r) => {
-              const row = r as unknown as Record<string, string>;
-              const label = field.optionsFrom!.labelSuffixKey
-                ? `${row[field.optionsFrom!.labelKey]} (${row[field.optionsFrom!.labelSuffixKey]})`
-                : row[field.optionsFrom!.labelKey];
-              return { value: row[field.optionsFrom!.valueKey], label };
+              const row = r as unknown as Record<string, unknown>;
+              const label = from.formatLabel
+                ? from.formatLabel(row)
+                : from.labelSuffixKey
+                  ? `${String(row[from.labelKey])} (${String(row[from.labelSuffixKey])})`
+                  : String(row[from.labelKey]);
+              return { value: String(row[from.valueKey]), label };
             }) || [];
         }
       }

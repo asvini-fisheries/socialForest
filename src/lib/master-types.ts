@@ -16,6 +16,8 @@ export interface MasterField {
     valueKey: string;
     labelKey: string;
     labelSuffixKey?: string;
+    selectQuery?: string;
+    formatLabel?: (row: Record<string, unknown>) => string;
   };
   /** Coerce value to number on save (e.g. numeric select) */
   coerceNumber?: boolean;
@@ -39,6 +41,23 @@ export interface ImportColumnSpec {
     labelSuffixKey?: string;
   };
   options?: { value: string; label: string }[];
+  /** Resolved for import only; not inserted into row payload */
+  importOnly?: boolean;
+}
+
+export interface CompositeLookupSpec {
+  targetKey: string;
+  table: string;
+  matchFields: Array<{
+    importKey: string;
+    rowField: string;
+    resolveFrom: {
+      table: string;
+      valueKey: string;
+      labelKey: string;
+      labelSuffixKey?: string;
+    };
+  }>;
 }
 
 export interface MasterConfig {
