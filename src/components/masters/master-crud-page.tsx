@@ -34,6 +34,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   );
   const importEnabled = tableSpec?.importEnabled ?? false;
   const imageField = config.imageField ?? getMasterImageField(config.table);
+  const mutationApi = config.apiRoute ?? `/api/masters/${config.table}/record`;
 
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [search, setSearch] = useState('');
@@ -130,6 +131,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     });
     setEditing(null);
     setForm(defaults);
+    setError('');
     resetImageState();
     setDialogOpen(true);
   }
@@ -141,6 +143,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       values[f.name] = row[f.name] ?? (f.type === 'boolean' ? false : '');
     });
     setForm(values);
+    setError('');
     resetImageState();
     setDialogOpen(true);
   }
@@ -175,8 +178,8 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       imageUrl = await uploadMasterImage(config.table, recordId, imageFile);
     }
 
-    if (config.apiRoute) {
-      const res = await fetch(config.apiRoute, {
+    if (config.apiRoute || mutationApi) {
+      const res = await fetch(mutationApi, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: recordId, ...payload, [imageField]: imageUrl }),
@@ -215,8 +218,8 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     try {
       let recordId = editing?.id as string | undefined;
 
-      if (config.apiRoute) {
-        const res = await fetch(config.apiRoute, {
+      if (config.apiRoute || mutationApi) {
+        const res = await fetch(mutationApi, {
           method: editing ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editing ? { id: editing.id, ...payload } : payload),
@@ -264,8 +267,8 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
 
     setError('');
     try {
-      if (config.apiRoute) {
-        const res = await fetch(`${config.apiRoute}?id=${row.id}`, { method: 'DELETE' });
+      if (config.apiRoute || mutationApi) {
+        const res = await fetch(`${mutationApi}?id=${row.id}`, { method: 'DELETE' });
         const result = await res.json();
         if (!res.ok) throw new Error(result.error || 'Delete failed');
       } else {
@@ -314,6 +317,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
           options={options}
           value={String(value ?? '')}
           onChange={(e) => updateField(field.name, e.target.value)}
+          required={field.required}
         />
       );
     }
@@ -472,8 +476,15 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       />
 
       <DialogRoot open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent title={editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}>
+        <DialogContent
+          title={editing ? `Edit ${config.title}` : `Add ${config.title}`}
+        >
           <form onSubmit={handleSave} className="space-y-4">
+            {error && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
             <MasterImageField
               currentUrl={imageClear ? null : String(editing?.[imageField] || '')}
               previewUrl={imagePreview}
