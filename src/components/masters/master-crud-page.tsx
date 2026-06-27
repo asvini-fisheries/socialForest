@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { getMasterTableSpec } from '@/lib/master-registry-data';
 import { filterMasterRows } from '@/lib/master-registry';
 import { getMasterImageField, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
+import { masterApiFetch, parseMasterApiError } from '@/lib/masters-api-client';
 import type { MasterConfig, MasterField } from '@/lib/master-types';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -75,15 +76,29 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   const loadRows = useCallback(async () => {
     setLoading(true);
     setError('');
-    const supabase = createClient();
-    const { data, error: err } = await supabase
-      .from(config.table)
-      .select(config.selectQuery || '*')
-      .order(config.orderBy);
-    if (err) setError(err.message);
-    else setRows((data as unknown as Record<string, unknown>[]) || []);
-    setLoading(false);
-  }, [config.table, config.orderBy, config.selectQuery]);
+
+    try {
+      if (isAdmin) {
+        const res = await masterApiFetch(`/api/masters/${config.table}/records`);
+        if (!res.ok) throw new Error(await parseMasterApiError(res));
+        const result = (await res.json()) as { data?: Record<string, unknown>[] };
+        setRows(result.data || []);
+      } else {
+        const supabase = createClient();
+        const { data, error: err } = await supabase
+          .from(config.table)
+          .select(config.selectQuery || '*')
+          .order(config.orderBy);
+        if (err) throw err;
+        setRows((data as unknown as Record<string, unknown>[]) || []);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load records');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [config.table, config.orderBy, config.selectQuery, isAdmin]);
 
   useEffect(() => {
     loadRows();
@@ -179,13 +194,11 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     }
 
     if (config.apiRoute || mutationApi) {
-      const res = await fetch(mutationApi, {
+      const res = await masterApiFetch(mutationApi, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: recordId, ...payload, [imageField]: imageUrl }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Image save failed');
+      if (!res.ok) throw new Error(await parseMasterApiError(res));
     } else {
       const supabase = createClient();
       const { error: err } = await supabase
@@ -219,14 +232,14 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       let recordId = editing?.id as string | undefined;
 
       if (config.apiRoute || mutationApi) {
-        const res = await fetch(mutationApi, {
+        const res = await masterApiFetch(mutationApi, {
           method: editing ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editing ? { id: editing.id, ...payload } : payload),
         });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Save failed');
-        recordId = editing ? (editing.id as string) : (result.id as string);
+        if (!res.ok) throw new Error(await parseMasterApiError(res));
+        const result = (await res.json()) as { id?: string };
+        recordId = editing ? (editing.id as string) : result.id;
+        if (!recordId) throw new Error('Save succeeded but no record id was returned');
       } else {
         const supabase = createClient();
         if (editing) {
@@ -268,9 +281,8 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     setError('');
     try {
       if (config.apiRoute || mutationApi) {
-        const res = await fetch(`${mutationApi}?id=${row.id}`, { method: 'DELETE' });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Delete failed');
+        const res = await masterApiFetch(`${mutationApi}?id=${row.id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await parseMasterApiError(res));
       } else {
         const supabase = createClient();
         if (config.softDelete !== false && 'is_active' in row) {
