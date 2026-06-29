@@ -11,7 +11,10 @@ export const metadata: Metadata = {
     'Comprehensive CSR agroforestry project management platform with stakeholder tracking, daily activities, billing, and ESG reporting.',
   manifest: '/manifest.json',
   icons: {
-    icon: '/socialforest-icon.png',
+    icon: [
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
     apple: '/icon-192.png',
   },
 };
