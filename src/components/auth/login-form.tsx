@@ -12,7 +12,8 @@ import { validateMobile, maskMobile } from '@/lib/utils';
 import { getAuthErrorMessage, validateEmail, maskEmail } from '@/lib/auth-errors';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
-import type { User, Year, Project } from '@/types/database';
+import { fetchAllProjectsForUser } from '@/lib/projects';
+import type { User, Project } from '@/types/database';
 import { ROLE_LABELS } from '@/types/database';
 
 type LoginMethod = 'email' | 'mobile';
@@ -27,12 +28,10 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [userProfile, setUserProfile] = useState<User | null>(null);
-  const [years, setYears] = useState<Year[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedYearId, setSelectedYearId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
 
-  const { setUser, setSelectedYear, setSelectedProject } = useAuth();
+  const { setUser, selectProject } = useAuth();
   const router = useRouter();
   const supabase = createClient();
 
@@ -120,15 +119,13 @@ export function LoginForm() {
       const profile = await loadUserProfile();
       setUserProfile(profile);
 
-      const { data: yearsData, error: yearsError } = await supabase
-        .from('years')
-        .select('*')
-        .eq('is_active', true)
-        .order('start_date', { ascending: false });
-
-      if (yearsError) throw yearsError;
-
-      setYears(yearsData || []);
+      const projectsData = await fetchAllProjectsForUser(profile);
+      if (projectsData.length === 0) {
+        setError('No active projects are assigned to your account. Contact your administrator.');
+        return;
+      }
+      setProjects(projectsData);
+      setSelectedProjectId(projectsData[0].id);
       setStep('selection');
     } catch (err) {
       setError(getAuthErrorMessage(err, 'Verification failed. Please check the code and try again.'));
@@ -137,70 +134,17 @@ export function LoginForm() {
     }
   }
 
-  async function handleYearChange(yearId: string) {
-    setSelectedYearId(yearId);
-    setSelectedProjectId('');
-    if (!yearId || !userProfile) return;
-
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('projects')
-        .select('*, year:years(*), csr_partner:csr_partners(name), organisation:organisations(name)')
-        .eq('year_id', yearId)
-        .eq('is_active', true);
-
-      if (userProfile.role === 'csr_partner' && userProfile.csr_partner_id) {
-        query = query.eq('csr_partner_id', userProfile.csr_partner_id);
-      } else if (userProfile.role === 'organisation' && userProfile.organisation_id) {
-        query = query.eq('organisation_id', userProfile.organisation_id);
-      } else if (userProfile.role === 'stakeholder' && userProfile.stakeholder_id) {
-        const { data: allocations } = await supabase
-          .from('activity_contractor_allocations')
-          .select('project_activity_id, project_activities!inner(project_id)')
-          .eq('stakeholder_id', userProfile.stakeholder_id);
-
-        const projectIds = [
-          ...new Set(
-            allocations?.map((a) => {
-              const pa = a.project_activities as unknown as { project_id: string };
-              return pa.project_id;
-            }) || []
-          ),
-        ];
-
-        if (projectIds.length > 0) {
-          query = query.in('id', projectIds);
-        } else {
-          setProjects([]);
-          setLoading(false);
-          return;
-        }
-      }
-
-      const { data: projectsData } = await query.order('name');
-      setProjects(projectsData || []);
-    } catch {
-      setError('Failed to load projects. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function handleLogin() {
-    if (!userProfile || !selectedYearId || !selectedProjectId) {
-      setError('Please select both year and project');
+    if (!userProfile || !selectedProjectId) {
+      setError('Please select a project');
       return;
     }
 
-    const year = years.find((y) => y.id === selectedYearId);
     const project = projects.find((p) => p.id === selectedProjectId);
-
-    if (!year || !project) return;
+    if (!project) return;
 
     setUser(userProfile);
-    setSelectedYear(year);
-    setSelectedProject(project);
+    selectProject(project);
     router.push('/dashboard');
   }
 
@@ -217,6 +161,9 @@ export function LoginForm() {
 
   const otpTarget =
     method === 'email' ? maskEmail(email.trim().toLowerCase()) : maskMobile(mobile);
+
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const selectedYearLabel = selectedProject?.year?.year_label;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 p-4">
@@ -337,13 +284,6 @@ export function LoginForm() {
             {step === 'selection' && (
               <>
                 <Select
-                  label="Financial Year"
-                  placeholder="Select year"
-                  options={years.map((y) => ({ value: y.id, label: y.year_label }))}
-                  value={selectedYearId}
-                  onChange={(e) => handleYearChange(e.target.value)}
-                />
-                <Select
                   label="Project"
                   placeholder={loading ? 'Loading projects...' : 'Select project'}
                   options={projects.map((p) => ({
@@ -352,11 +292,17 @@ export function LoginForm() {
                   }))}
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
-                  disabled={!selectedYearId || loading}
+                  disabled={loading || projects.length === 0}
                 />
+                {selectedYearLabel && (
+                  <p className="text-sm text-gray-500">
+                    Financial year: <span className="font-medium text-gray-700">{selectedYearLabel}</span>
+                    <span className="block text-xs mt-1">Year is taken from the selected project.</span>
+                  </p>
+                )}
                 <Button
                   onClick={handleLogin}
-                  disabled={!selectedYearId || !selectedProjectId}
+                  disabled={!selectedProjectId || loading}
                   className="w-full"
                   size="lg"
                 >

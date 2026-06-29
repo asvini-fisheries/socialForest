@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMasterTableSpec } from '@/lib/master-registry-data';
+import { apiProjectFilterColumn } from '@/lib/master-project-scope';
 import {
   assertServiceRoleKey,
   getMasterServiceClient,
@@ -25,7 +26,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const service = getMasterServiceClient();
   const select = spec.selectQuery || '*';
-  const { data, error } = await service.from(table).select(select).order(spec.orderBy);
+  const projectId = request.nextUrl.searchParams.get('project_id');
+  const filterColumn = apiProjectFilterColumn(table);
+
+  let query = service.from(table).select(select).order(spec.orderBy);
+  if (projectId && filterColumn) {
+    query = query.eq(filterColumn, projectId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

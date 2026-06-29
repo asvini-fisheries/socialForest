@@ -1,5 +1,56 @@
 import { createClient } from '@/lib/supabase/client';
-import type { Project, User } from '@/types/database';
+import type { Project, User, Year } from '@/types/database';
+
+function sortProjectsLatestFirst(projects: Project[]): Project[] {
+  return [...projects].sort((a, b) => {
+    const yearA = (a.year as Year | undefined)?.start_date ?? '';
+    const yearB = (b.year as Year | undefined)?.start_date ?? '';
+    if (yearA !== yearB) return yearB.localeCompare(yearA);
+    const startA = a.start_date ?? '';
+    const startB = b.start_date ?? '';
+    if (startA !== startB) return startB.localeCompare(startA);
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/** All active projects the user can access (any year), latest first. */
+export async function fetchAllProjectsForUser(user: User): Promise<Project[]> {
+  const supabase = createClient();
+
+  let query = supabase
+    .from('projects')
+    .select(
+      '*, year:years(*), csr_partner:csr_partners(name, code), organisation:organisations(name, code)'
+    )
+    .eq('is_active', true);
+
+  if (user.role === 'csr_partner' && user.csr_partner_id) {
+    query = query.eq('csr_partner_id', user.csr_partner_id);
+  } else if (user.role === 'organisation' && user.organisation_id) {
+    query = query.eq('organisation_id', user.organisation_id);
+  } else if (user.role === 'stakeholder' && user.stakeholder_id) {
+    const { data: allocations } = await supabase
+      .from('activity_contractor_allocations')
+      .select('project_activity_id, project_activities!inner(project_id)')
+      .eq('stakeholder_id', user.stakeholder_id);
+
+    const projectIds = [
+      ...new Set(
+        allocations?.map((a) => {
+          const pa = a.project_activities as unknown as { project_id: string };
+          return pa.project_id;
+        }) || []
+      ),
+    ];
+
+    if (projectIds.length === 0) return [];
+    query = query.in('id', projectIds);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return sortProjectsLatestFirst((data as Project[]) || []);
+}
 
 export async function fetchProjectsForUser(
   user: User,

@@ -18,6 +18,8 @@ import { getMasterTableSpec } from '@/lib/master-registry-data';
 import { filterMasterRows } from '@/lib/master-registry';
 import { getMasterImageField, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
 import { masterApiFetch, parseMasterApiError } from '@/lib/masters-api-client';
+import { filterRowsByProject, getMasterProjectScope, apiProjectFilterColumn } from '@/lib/master-project-scope';
+import { ProjectSelector } from '@/components/layout/project-selector';
 import type { MasterConfig, MasterField } from '@/lib/master-types';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -26,7 +28,7 @@ interface MasterCrudPageProps {
 }
 
 export function MasterCrudPage({ config }: MasterCrudPageProps) {
-  const { user } = useAuth();
+  const { user, selectedProject } = useAuth();
   const isAdmin = user?.role === 'admin';
   const tableSpec = getMasterTableSpec(config.table);
   const searchKeys = useMemo(
@@ -73,24 +75,46 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     [rows, search, searchKeys]
   );
 
+  const projectScope = useMemo(() => getMasterProjectScope(config.table), [config.table]);
+
   const loadRows = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
+      const projectQuery =
+        selectedProject?.id && apiProjectFilterColumn(config.table)
+          ? `?project_id=${encodeURIComponent(selectedProject.id)}`
+          : '';
+
       if (isAdmin) {
-        const res = await masterApiFetch(`/api/masters/${config.table}/records`);
+        const res = await masterApiFetch(`/api/masters/${config.table}/records${projectQuery}`);
         if (!res.ok) throw new Error(await parseMasterApiError(res));
         const result = (await res.json()) as { data?: Record<string, unknown>[] };
-        setRows(result.data || []);
+        let data = result.data || [];
+        if (projectScope.type === 'nested' || projectScope.type === 'optionalField') {
+          data = filterRowsByProject(data, config.table, selectedProject?.id ?? '');
+        }
+        setRows(data);
       } else {
         const supabase = createClient();
-        const { data, error: err } = await supabase
-          .from(config.table)
-          .select(config.selectQuery || '*')
-          .order(config.orderBy);
+        let query = supabase.from(config.table).select(config.selectQuery || '*').order(config.orderBy);
+        const filterCol =
+          projectScope.type === 'field'
+            ? projectScope.field
+            : projectScope.type === 'id'
+              ? 'id'
+              : null;
+        if (filterCol && selectedProject?.id) {
+          query = query.eq(filterCol, selectedProject.id);
+        }
+        const { data, error: err } = await query;
         if (err) throw err;
-        setRows((data as unknown as Record<string, unknown>[]) || []);
+        let rows = (data as unknown as Record<string, unknown>[]) || [];
+        if (projectScope.type === 'nested' || projectScope.type === 'optionalField') {
+          rows = filterRowsByProject(rows, config.table, selectedProject?.id ?? '');
+        }
+        setRows(rows);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load records');
@@ -98,7 +122,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [config.table, config.orderBy, config.selectQuery, isAdmin]);
+  }, [config.table, config.orderBy, config.selectQuery, isAdmin, projectScope, selectedProject?.id]);
 
   useEffect(() => {
     loadRows();
@@ -111,10 +135,17 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       for (const field of config.fields) {
         if (field.optionsFrom) {
           const from = field.optionsFrom;
-          const { data } = await supabase
-            .from(from.table)
-            .select(from.selectQuery || '*')
-            .order(from.labelKey);
+          let query = supabase.from(from.table).select(from.selectQuery || '*').order(from.labelKey);
+          if (selectedProject?.id) {
+            if (field.name === 'project_id') {
+              query = query.eq('id', selectedProject.id);
+            } else if (from.table === 'project_areas' || from.table === 'project_activities') {
+              query = query.eq('project_id', selectedProject.id);
+            } else if (from.table === 'work_contracts') {
+              query = query.eq('project_id', selectedProject.id);
+            }
+          }
+          const { data } = await query;
           opts[field.name] =
             data?.map((r) => {
               const row = r as unknown as Record<string, unknown>;
@@ -131,7 +162,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     }
     loadDynamicOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.table]);
+  }, [config.table, selectedProject?.id]);
 
   function resetImageState() {
     setImageFile(null);
@@ -144,6 +175,9 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     config.fields.forEach((f) => {
       if (f.type === 'boolean' && defaults[f.name] === undefined) defaults[f.name] = true;
     });
+    if (selectedProject?.id && config.fields.some((f) => f.name === 'project_id')) {
+      defaults.project_id = selectedProject.id;
+    }
     setEditing(null);
     setForm(defaults);
     setError('');
@@ -321,6 +355,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     }
 
     if (field.type === 'select') {
+      const lockProjectField = field.name === 'project_id' && Boolean(selectedProject?.id);
       return (
         <Select
           key={field.name}
@@ -330,6 +365,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
           value={String(value ?? '')}
           onChange={(e) => updateField(field.name, e.target.value)}
           required={field.required}
+          disabled={lockProjectField}
         />
       );
     }
@@ -366,19 +402,22 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{config.title}</h1>
+            <h2 className="text-xl font-bold text-gray-900">{config.title}</h2>
             <p className="text-gray-500 mt-1">
               {isAdmin ? 'Search, import/export, and manage master records' : 'View master data (read only)'}
             </p>
           </div>
-          {isAdmin && (
-            <Button onClick={openCreate}>
-              <Plus className="w-4 h-4" />
-              Add New
-            </Button>
-          )}
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+            <ProjectSelector label="Project" className="w-full sm:w-72" />
+            {isAdmin && (
+              <Button onClick={openCreate}>
+                <Plus className="w-4 h-4" />
+                Add New
+              </Button>
+            )}
+          </div>
         </div>
 
         {error && (

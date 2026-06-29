@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { user, selectedProject, selectedYear } = useAuth();
+  const { user, selectedProject } = useAuth();
 
   const stats = [
     {
@@ -48,10 +48,8 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Project Dashboard</h1>
-          <p className="text-gray-500 mt-1">
-            {selectedProject?.name} — {selectedYear?.year_label}
-          </p>
+          <h2 className="text-xl font-semibold text-gray-900">Overview</h2>
+          <p className="text-gray-500 mt-1">Key metrics for the selected project</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

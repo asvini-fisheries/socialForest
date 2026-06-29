@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
+import { AppHeader } from '@/components/layout/app-header';
 import { ROLE_LABELS, MODULE_ACCESS, type UserRole } from '@/types/database';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -102,7 +103,7 @@ function canAccessModule(role: UserRole, module: string): boolean {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, selectedProject, selectedYear, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
 
@@ -123,12 +124,7 @@ export function Sidebar() {
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-gray-200">
         <Logo size="sm" className="w-full max-w-[160px]" />
-        <p className="text-xs text-gray-500 mt-2">{selectedYear?.year_label}</p>
-        {selectedProject && (
-          <div className="mt-3 p-2 bg-emerald-50 rounded-lg">
-            <p className="text-xs text-emerald-700 font-medium truncate">{selectedProject.name}</p>
-          </div>
-        )}
+        <p className="text-xs text-gray-500 mt-2">CSR Agroforestry Management</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
@@ -232,6 +228,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
       <main className="lg:pl-64">
+        <AppHeader />
         <div className="p-4 md:p-6 lg:p-8">{children}</div>
       </main>
     </div>

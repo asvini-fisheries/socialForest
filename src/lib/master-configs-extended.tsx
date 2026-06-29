@@ -430,7 +430,7 @@ export const activityResourceRequirementsConfig: MasterConfig = {
   orderBy: 'created_at',
   softDelete: false,
   selectQuery:
-    '*, project_activity:project_activities(project:projects(name), activity:activities(name), project_area:project_areas(name)), resource:resources_materials(name, code)',
+    '*, project_activity:project_activities(project_id, project:projects(name), activity:activities(name), project_area:project_areas(name)), resource:resources_materials(name, code)',
   searchKeys: ['project_activity', 'resource'],
   fields: [
     {
@@ -488,7 +488,7 @@ export const activityContractorAllocationsConfig: MasterConfig = {
   icon: HardHat,
   orderBy: 'start_date',
   selectQuery:
-    '*, project_activity:project_activities(project:projects(name), activity:activities(name)), stakeholder:stakeholders(name, code)',
+    '*, project_activity:project_activities(project_id, project:projects(name), activity:activities(name)), stakeholder:stakeholders(name, code)',
   searchKeys: ['project_activity', 'stakeholder'],
   fields: [
     {
@@ -616,7 +616,7 @@ export const workContractItemsConfig: MasterConfig = {
   orderBy: 'created_at',
   softDelete: false,
   selectQuery:
-    '*, contract:work_contracts(contract_number, project:projects(name)), resource:resources_materials(name), activity:activities(name)',
+    '*, contract:work_contracts(contract_number, project_id, project:projects(name)), resource:resources_materials(name), activity:activities(name)',
   searchKeys: ['description', 'contract'],
   fields: [
     {
