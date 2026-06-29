@@ -14,7 +14,7 @@
     "dev:webpack": "next dev . -p 4350 -H 0.0.0.0",
     "prebuild": "node scripts/ensure-project-root.mjs && node scripts/ensure-env.mjs",
     "build": "next build",
-    "start": "next start -p 4350 -H 0.0.0.0",
+    "start": "node scripts/start.mjs",
     "validate:db": "node scripts/validate-db.mjs",
     "apply:migration": "node scripts/apply-migration.mjs supabase/migrations/010_resource_categories.sql",
     "apply:migration:011": "node scripts/apply-migration-011.mjs",
