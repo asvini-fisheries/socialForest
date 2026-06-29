@@ -43,6 +43,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
 
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [search, setSearch] = useState('');
+  const [columnFilterValues, setColumnFilterValues] = useState<Record<string, string>>({});
   const [logsOpen, setLogsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -77,8 +78,15 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   );
 
   const filteredRows = useMemo(
-    () => filterMasterRows(rows, search, searchKeys),
-    [rows, search, searchKeys]
+    () =>
+      filterMasterRows(
+        rows,
+        search,
+        searchKeys,
+        config.columnFilters,
+        columnFilterValues
+      ),
+    [rows, search, searchKeys, config.columnFilters, columnFilterValues]
   );
 
   const projectScope = useMemo(() => getMasterProjectScope(config.table), [config.table]);
@@ -450,6 +458,22 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+          </div>
+        )}
+
+        {config.columnFilters && config.columnFilters.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {config.columnFilters.map((filter) => (
+              <Input
+                key={filter.id}
+                label={filter.label}
+                placeholder={filter.placeholder || `Filter ${filter.label.toLowerCase()}…`}
+                value={columnFilterValues[filter.id] ?? ''}
+                onChange={(e) =>
+                  setColumnFilterValues((prev) => ({ ...prev, [filter.id]: e.target.value }))
+                }
+              />
+            ))}
           </div>
         )}
 

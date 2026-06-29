@@ -29,6 +29,14 @@ export interface MasterColumn<T> {
   render: (row: T) => ReactNode;
 }
 
+/** Per-column text filter shown above the grid */
+export interface MasterColumnFilter {
+  id: string;
+  label: string;
+  placeholder?: string;
+  getValue: (row: Record<string, unknown>) => string;
+}
+
 export interface ImportColumnSpec {
   key: string;
   header: string;
@@ -75,6 +83,8 @@ export interface MasterConfig {
   defaultValues?: Record<string, unknown>;
   /** Fields used for client-side search (defaults to text fields) */
   searchKeys?: string[];
+  /** Optional per-column filters (e.g. Project, Parent, Code) */
+  columnFilters?: MasterColumnFilter[];
   /** DB column for image (default: image_url, logo_url, or avatar_url per table) */
   imageField?: string;
   /** Show image upload in CRUD dialog and image column in grid (default: true for known master tables) */

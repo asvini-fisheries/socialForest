@@ -216,6 +216,8 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     table: 'projects',
     orderBy: 'name',
     importEnabled: true,
+    selectQuery:
+      '*, year:years(year_label), csr_partner:csr_partners(name), organisation:organisations(name)',
     searchKeys: ['name', 'code', 'location', 'district', 'state'],
     importColumns: [
       {
@@ -270,7 +272,9 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     table: 'project_areas',
     orderBy: 'level',
     importEnabled: true,
-    searchKeys: ['name', 'code', 'description'],
+    selectQuery:
+      '*, project:projects(name, code), parent_area:project_areas!parent_area_id(name, code)',
+    searchKeys: ['name', 'code', 'description', 'project', 'parent_area'],
     importColumns: [
       {
         key: 'project_id',
@@ -336,6 +340,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     table: 'project_user_access',
     orderBy: 'created_at',
     importEnabled: true,
+    selectQuery: '*, project:projects(name, code), user:users(full_name, mobile, email)',
     searchKeys: ['project', 'user'],
     importColumns: [
       {
