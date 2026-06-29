@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { getMasterTableSpec } from '@/lib/master-registry-data';
 import { filterMasterRows, hasActiveColumnFilters } from '@/lib/master-registry';
-import { buildMasterFilterOptions } from '@/lib/master-display';
+import { buildMasterFilterOptions, enrichProjectAreaParents } from '@/lib/master-display';
 import { getMasterImageField, masterTableSupportsImages, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
 import { masterApiFetch, parseMasterApiError } from '@/lib/masters-api-client';
 import { filterRowsByProject, getMasterProjectScope, apiProjectFilterColumn } from '@/lib/master-project-scope';
@@ -123,6 +123,9 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
         if (!res.ok) throw new Error(await parseMasterApiError(res));
         const result = (await res.json()) as { data?: Record<string, unknown>[] };
         let data = result.data || [];
+        if (config.table === 'project_areas') {
+          data = enrichProjectAreaParents(data);
+        }
         if (projectScope.type === 'nested' || projectScope.type === 'optionalField') {
           data = filterRowsByProject(data, config.table, selectedProject?.id ?? '');
         }
@@ -142,6 +145,9 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
         const { data, error: err } = await query;
         if (err) throw err;
         let rows = (data as unknown as Record<string, unknown>[]) || [];
+        if (config.table === 'project_areas') {
+          rows = enrichProjectAreaParents(rows);
+        }
         if (projectScope.type === 'nested' || projectScope.type === 'optionalField') {
           rows = filterRowsByProject(rows, config.table, selectedProject?.id ?? '');
         }

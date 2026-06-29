@@ -273,7 +273,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     orderBy: 'level',
     importEnabled: true,
     selectQuery:
-      '*, project:projects(name, code), parent_area:project_areas!parent_area_id(name, code)',
+      '*, project:projects(name, code), parent_area:parent_area_id(name, code)',
     searchKeys: ['name', 'code', 'description', 'project', 'parent_area'],
     importColumns: [
       {
