@@ -14,6 +14,7 @@ import {
   ListOrdered,
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
+import { formatProjectCode } from '@/lib/master-display';
 import type { MasterConfig } from '@/lib/master-types';
 
 const PROJECT_ACTIVITY_OPTIONS = {
@@ -208,10 +209,11 @@ export const stakeholderSupplyRatesConfig: MasterConfig = {
     },
     {
       key: 'project',
-      header: 'Project',
+      header: 'Proj Code',
       render: (r) => {
-        const p = r.project as { name?: string } | null;
-        return p?.name || 'All projects';
+        const p = r.project as { name?: string; code?: string } | null;
+        if (!p) return 'All projects';
+        return formatProjectCode(p);
       },
     },
     { key: 'rate', header: 'Rate', render: (r) => formatCurrency(Number(r.rate || 0)) },
@@ -590,11 +592,8 @@ export const workContractsConfig: MasterConfig = {
     { key: 'number', header: 'Contract #', render: (r) => String(r.contract_number || '—') },
     {
       key: 'project',
-      header: 'Project',
-      render: (r) => {
-        const p = r.project as { name?: string } | null;
-        return p?.name || '—';
-      },
+      header: 'Proj Code',
+      render: (r) => formatProjectCode(r.project),
     },
     {
       key: 'stakeholder',

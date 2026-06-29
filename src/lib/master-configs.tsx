@@ -18,7 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { ROLE_LABELS } from '@/types/database';
 import { formatProjectStatus } from '@/lib/projects';
-import { formatAreaRef, projectAreaParentText, projectAreaProjectText, projectActivityActivityKey, projectActivityActivityText, projectActivityAreaKey, projectActivityAreaText, projectActivityProjectText } from '@/lib/master-display';
+import { formatAreaRef, formatProjectCode, projectAreaParentText, projectAreaProjectText, projectActivityActivityKey, projectActivityActivityText, projectActivityAreaKey, projectActivityAreaText, projectActivityProjectText } from '@/lib/master-display';
 import type { MasterConfig } from '@/lib/master-types';
 
 const USER_ROLES = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -433,8 +433,8 @@ export const projectAreasConfig: MasterConfig = {
   columns: [
     {
       key: 'project',
-      header: 'Project',
-      render: (r) => formatAreaRef(r.project) || '—',
+      header: 'Proj Code',
+      render: (r) => formatProjectCode(r.project),
     },
     { key: 'level', header: 'Level', render: (r) => String(r.level) },
     { key: 'name', header: 'Area', render: (r) => String(r.name) },
@@ -522,11 +522,8 @@ export const projectActivitiesConfig: MasterConfig = {
   columns: [
     {
       key: 'project',
-      header: 'Project',
-      render: (r) => {
-        const project = r.project as { name?: string } | null;
-        return project?.name || '—';
-      },
+      header: 'Proj Code',
+      render: (r) => formatProjectCode(r.project),
     },
     {
       key: 'activity',
@@ -596,11 +593,8 @@ export const projectUserAccessConfig: MasterConfig = {
   columns: [
     {
       key: 'project',
-      header: 'Project',
-      render: (r) => {
-        const project = r.project as { name?: string; code?: string } | null;
-        return project ? `${project.name}${project.code ? ` (${project.code})` : ''}` : '—';
-      },
+      header: 'Proj Code',
+      render: (r) => formatProjectCode(r.project),
     },
     {
       key: 'user',

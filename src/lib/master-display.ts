@@ -5,8 +5,22 @@ export function formatAreaRef(ref: unknown): string {
   return row.code ? `${row.name} (${row.code})` : row.name;
 }
 
+/** Compact project label for master grids — code only, fallback to name */
+export function formatProjectCode(ref: unknown): string {
+  const row = ref as { name?: string; code?: string } | null | undefined;
+  if (!row) return '—';
+  return row.code || row.name || '—';
+}
+
+/** Project text for filters (matches code or name) */
+export function formatProjectFilterText(ref: unknown): string {
+  const row = ref as { name?: string; code?: string } | null | undefined;
+  if (!row) return '';
+  return [row.code, row.name].filter(Boolean).join(' ');
+}
+
 export function projectAreaProjectText(row: Record<string, unknown>): string {
-  return formatAreaRef(row.project);
+  return formatProjectFilterText(row.project);
 }
 
 export function projectAreaParentText(row: Record<string, unknown>): string {
@@ -14,7 +28,7 @@ export function projectAreaParentText(row: Record<string, unknown>): string {
 }
 
 export function projectActivityProjectText(row: Record<string, unknown>): string {
-  return formatAreaRef(row.project);
+  return formatProjectFilterText(row.project);
 }
 
 export function projectActivityActivityText(row: Record<string, unknown>): string {
