@@ -77,4 +77,6 @@ export interface MasterConfig {
   searchKeys?: string[];
   /** DB column for image (default: image_url, logo_url, or avatar_url per table) */
   imageField?: string;
+  /** Show image upload in CRUD dialog and image column in grid (default: true for known master tables) */
+  imageAttachments?: boolean;
 }

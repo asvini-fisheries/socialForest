@@ -16,7 +16,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { getMasterTableSpec } from '@/lib/master-registry-data';
 import { filterMasterRows } from '@/lib/master-registry';
-import { getMasterImageField, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
+import { getMasterImageField, masterTableSupportsImages, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
 import { masterApiFetch, parseMasterApiError } from '@/lib/masters-api-client';
 import { filterRowsByProject, getMasterProjectScope, apiProjectFilterColumn } from '@/lib/master-project-scope';
 import { ProjectSelector } from '@/components/layout/project-selector';
@@ -36,6 +36,8 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     [config.searchKeys, tableSpec?.searchKeys]
   );
   const importEnabled = tableSpec?.importEnabled ?? false;
+  const supportsImages =
+    config.imageAttachments ?? masterTableSupportsImages(config.table);
   const imageField = config.imageField ?? getMasterImageField(config.table);
   const mutationApi = config.apiRoute ?? `/api/masters/${config.table}/record`;
 
@@ -55,19 +57,23 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
 
   const gridColumns = useMemo(
     () => [
-      {
-        key: '_image',
-        header: 'Image',
-        render: (row: Record<string, unknown>) => (
-          <MasterImageCell
-            url={String(row[imageField] || '')}
-            alt={String(row.name || row.full_name || row.year_label || config.title)}
-          />
-        ),
-      },
+      ...(supportsImages
+        ? [
+            {
+              key: '_image',
+              header: 'Image',
+              render: (row: Record<string, unknown>) => (
+                <MasterImageCell
+                  url={String(row[imageField] || '')}
+                  alt={String(row.name || row.full_name || row.year_label || config.title)}
+                />
+              ),
+            },
+          ]
+        : []),
       ...config.columns,
     ],
-    [config.columns, config.title, imageField]
+    [config.columns, config.title, imageField, supportsImages]
   );
 
   const filteredRows = useMemo(
@@ -294,7 +300,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
         }
       }
 
-      if (recordId && (imageFile || imageClear)) {
+      if (recordId && supportsImages && (imageFile || imageClear)) {
         await saveImageForRecord(recordId, payload);
       }
 
@@ -536,12 +542,14 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
                 {error}
               </div>
             )}
-            <MasterImageField
-              currentUrl={imageClear ? null : String(editing?.[imageField] || '')}
-              previewUrl={imagePreview}
-              onFileSelect={handleImageSelect}
-              onClear={handleImageClear}
-            />
+            {supportsImages && (
+              <MasterImageField
+                currentUrl={imageClear ? null : String(editing?.[imageField] || '')}
+                previewUrl={imagePreview}
+                onFileSelect={handleImageSelect}
+                onClear={handleImageClear}
+              />
+            )}
             {config.fields.map(renderField)}
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

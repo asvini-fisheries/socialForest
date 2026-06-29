@@ -102,6 +102,13 @@ export default function ProjectDetailPage() {
         ) : (
           <>
             <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                {project.image_url && (
+                  <div className="w-24 h-24 rounded-xl border border-gray-200 overflow-hidden shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={project.image_url} alt={project.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
@@ -117,6 +124,7 @@ export default function ProjectDetailPage() {
                 {project.description && (
                   <p className="text-gray-600 mt-2 max-w-2xl">{project.description}</p>
                 )}
+              </div>
               </div>
               {isAdmin && (
                 <Button variant="outline" onClick={() => setEditOpen(true)}>

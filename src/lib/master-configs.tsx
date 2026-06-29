@@ -44,6 +44,7 @@ const AREA_LEVEL_OPTIONS = [
 export const yearsConfig: MasterConfig = {
   title: 'Years',
   table: 'years',
+  imageAttachments: true,
   icon: Calendar,
   orderBy: 'start_date',
   softDelete: false,
@@ -65,6 +66,7 @@ export const yearsConfig: MasterConfig = {
 export const designationsConfig: MasterConfig = {
   title: 'Designations',
   table: 'designations',
+  imageAttachments: true,
   icon: ClipboardList,
   orderBy: 'name',
   fields: [
@@ -83,6 +85,7 @@ export const designationsConfig: MasterConfig = {
 export const certificatesConfig: MasterConfig = {
   title: 'Certificates',
   table: 'certificates',
+  imageAttachments: true,
   icon: FileText,
   orderBy: 'name',
   fields: [
@@ -103,6 +106,7 @@ export const certificatesConfig: MasterConfig = {
 export const csrPartnersConfig: MasterConfig = {
   title: 'CSR Partners',
   table: 'csr_partners',
+  imageAttachments: true,
   icon: Handshake,
   orderBy: 'name',
   fields: [
@@ -130,6 +134,7 @@ export const csrPartnersConfig: MasterConfig = {
 export const organisationsConfig: MasterConfig = {
   title: 'Organisations',
   table: 'organisations',
+  imageAttachments: true,
   icon: Building2,
   orderBy: 'name',
   fields: [
@@ -156,6 +161,7 @@ export const organisationsConfig: MasterConfig = {
 export const stakeholdersConfig: MasterConfig = {
   title: 'Stakeholders',
   table: 'stakeholders',
+  imageAttachments: true,
   icon: Users,
   orderBy: 'name',
   fields: [
@@ -188,6 +194,7 @@ export const stakeholdersConfig: MasterConfig = {
 export const activitiesConfig: MasterConfig = {
   title: 'Activities',
   table: 'activities',
+  imageAttachments: true,
   icon: Activity,
   orderBy: 'name',
   fields: [
@@ -209,6 +216,7 @@ export const activitiesConfig: MasterConfig = {
 export const resourceCategoriesConfig: MasterConfig = {
   title: 'Resource Categories',
   table: 'resource_categories',
+  imageAttachments: true,
   icon: Tags,
   orderBy: 'name',
   fields: [
@@ -245,6 +253,7 @@ export const resourceCategoriesConfig: MasterConfig = {
 export const resourcesConfig: MasterConfig = {
   title: 'Resources / Materials',
   table: 'resources_materials',
+  imageAttachments: true,
   icon: Package,
   orderBy: 'name',
   selectQuery: '*, resource_category:resource_categories(name, category_type)',
@@ -288,6 +297,7 @@ export const resourcesConfig: MasterConfig = {
 export const projectsConfig: MasterConfig = {
   title: 'Projects',
   table: 'projects',
+  imageAttachments: true,
   icon: FolderKanban,
   orderBy: 'name',
   selectQuery: '*, year:years(year_label), csr_partner:csr_partners(name), organisation:organisations(name)',
@@ -364,6 +374,7 @@ export const projectsConfig: MasterConfig = {
 export const projectAreasConfig: MasterConfig = {
   title: 'Project Areas',
   table: 'project_areas',
+  imageAttachments: true,
   icon: MapPin,
   orderBy: 'level',
   selectQuery:
@@ -430,6 +441,7 @@ export const projectAreasConfig: MasterConfig = {
 export const projectActivitiesConfig: MasterConfig = {
   title: 'Project Activities',
   table: 'project_activities',
+  imageAttachments: true,
   icon: Activity,
   orderBy: 'planned_start_date',
   selectQuery:
@@ -514,6 +526,7 @@ export const projectActivitiesConfig: MasterConfig = {
 export const projectUserAccessConfig: MasterConfig = {
   title: 'Project User Access',
   table: 'project_user_access',
+  imageAttachments: true,
   icon: UserCheck,
   orderBy: 'created_at',
   softDelete: false,
@@ -563,6 +576,7 @@ export const projectUserAccessConfig: MasterConfig = {
 export const usersConfig: MasterConfig = {
   title: 'Users',
   table: 'users',
+  imageAttachments: true,
   icon: Users,
   orderBy: 'full_name',
   apiRoute: '/api/admin/users',

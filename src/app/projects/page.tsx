@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
+import { MasterImageCell } from '@/components/masters/master-image-cell';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchProjectsForUser, formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
 import { createClient } from '@/lib/supabase/client';
@@ -121,11 +122,14 @@ export default function ProjectsPage() {
                 <Card className="hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer h-full">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="flex items-start gap-3 min-w-0">
+                        <MasterImageCell url={project.image_url || ''} alt={project.name} />
+                        <div className="min-w-0">
                         <CardTitle className="text-lg">{project.name}</CardTitle>
                         {project.code && (
                           <p className="text-sm text-gray-500 mt-0.5">{project.code}</p>
                         )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {isAdmin && (

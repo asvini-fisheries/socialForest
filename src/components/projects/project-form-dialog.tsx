@@ -5,8 +5,10 @@ import { DialogRoot, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { MasterImageField } from '@/components/masters/master-image-field';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
+import { saveRecordImage } from '@/lib/master-image';
 import type { Project, ProjectStatus } from '@/types/database';
 import { Loader2 } from 'lucide-react';
 
@@ -32,6 +34,9 @@ export function ProjectFormDialog({ open, onOpenChange, project, onSaved }: Proj
   const [years, setYears] = useState<{ value: string; label: string }[]>([]);
   const [csrPartners, setCsrPartners] = useState<{ value: string; label: string }[]>([]);
   const [organisations, setOrganisations] = useState<{ value: string; label: string }[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageClear, setImageClear] = useState(false);
 
   const [form, setForm] = useState({
     year_id: '',
@@ -66,6 +71,10 @@ export function ProjectFormDialog({ open, onOpenChange, project, onSaved }: Proj
       setOrganisations(o.data?.map((r) => ({ value: r.id, label: r.name })) || []);
     }
     loadOptions();
+
+    setImageFile(null);
+    setImagePreview(null);
+    setImageClear(false);
 
     if (project) {
       setForm({
@@ -113,6 +122,23 @@ export function ProjectFormDialog({ open, onOpenChange, project, onSaved }: Proj
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function handleImageSelect(file: File | null) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5 MB');
+      return;
+    }
+    setImageFile(file);
+    setImageClear(false);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  function handleImageClear() {
+    setImageFile(null);
+    setImagePreview(null);
+    setImageClear(true);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
@@ -140,14 +166,40 @@ export function ProjectFormDialog({ open, onOpenChange, project, onSaved }: Proj
     };
 
     const supabase = createClient();
-    const { error: err } = project
-      ? await supabase.from('projects').update(payload).eq('id', project.id)
-      : await supabase.from('projects').insert(payload);
+    let recordId = project?.id;
 
-    if (err) {
-      setError(err.message);
-      setSaving(false);
-      return;
+    if (project) {
+      const { error: err } = await supabase.from('projects').update(payload).eq('id', project.id);
+      if (err) {
+        setError(err.message);
+        setSaving(false);
+        return;
+      }
+    } else {
+      const { data, error: err } = await supabase.from('projects').insert(payload).select('id').single();
+      if (err) {
+        setError(err.message);
+        setSaving(false);
+        return;
+      }
+      recordId = data.id;
+    }
+
+    if (recordId && (imageFile || imageClear)) {
+      try {
+        await saveRecordImage(
+          'projects',
+          recordId,
+          'image_url',
+          imageFile,
+          imageClear,
+          project?.image_url
+        );
+      } catch (imgErr) {
+        setError(imgErr instanceof Error ? imgErr.message : 'Project saved but image upload failed');
+        setSaving(false);
+        return;
+      }
     }
 
     onSaved();
@@ -162,6 +214,14 @@ export function ProjectFormDialog({ open, onOpenChange, project, onSaved }: Proj
           {error && (
             <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>
           )}
+
+          <MasterImageField
+            label="Project Image"
+            currentUrl={imageClear ? null : project?.image_url}
+            previewUrl={imagePreview}
+            onFileSelect={handleImageSelect}
+            onClear={handleImageClear}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select label="Financial Year" options={years} value={form.year_id} onChange={(e) => set('year_id', e.target.value)} required />

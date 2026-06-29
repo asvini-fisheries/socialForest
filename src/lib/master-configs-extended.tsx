@@ -78,6 +78,7 @@ function renderProjectActivity(row: Record<string, unknown>, key: string) {
 export const stakeholderCategoriesConfig: MasterConfig = {
   title: 'Stakeholder Categories',
   table: 'stakeholder_categories',
+  imageAttachments: true,
   icon: Tags,
   orderBy: 'name',
   searchKeys: ['name', 'code', 'description'],
@@ -99,6 +100,7 @@ export const stakeholderCategoriesConfig: MasterConfig = {
 export const stakeholderResourcesConfig: MasterConfig = {
   title: 'Stakeholder Resources',
   table: 'stakeholder_resources',
+  imageAttachments: true,
   icon: Link2,
   orderBy: 'created_at',
   selectQuery: '*, stakeholder:stakeholders(name, code), resource:resources_materials(name, code)',
@@ -150,6 +152,7 @@ export const stakeholderResourcesConfig: MasterConfig = {
 export const stakeholderSupplyRatesConfig: MasterConfig = {
   title: 'Stakeholder Supply Rates',
   table: 'stakeholder_supply_rates',
+  imageAttachments: true,
   icon: IndianRupee,
   orderBy: 'effective_from',
   selectQuery:
@@ -229,6 +232,7 @@ export const stakeholderSupplyRatesConfig: MasterConfig = {
 export const stakeholderAccessRightsConfig: MasterConfig = {
   title: 'Stakeholder Access Rights',
   table: 'stakeholder_category_access_rights',
+  imageAttachments: true,
   icon: Shield,
   orderBy: 'module_name',
   searchKeys: ['module_name'],
@@ -270,6 +274,7 @@ export const stakeholderAccessRightsConfig: MasterConfig = {
 export const organisationContactsConfig: MasterConfig = {
   title: 'Organisation Contacts',
   table: 'organisation_contacts',
+  imageAttachments: true,
   icon: UserCircle,
   orderBy: 'name',
   selectQuery: '*, organisation:organisations(name, code)',
@@ -310,6 +315,7 @@ export const organisationContactsConfig: MasterConfig = {
 export const organisationCertificatesConfig: MasterConfig = {
   title: 'Organisation Certificates',
   table: 'organisation_certificates',
+  imageAttachments: true,
   icon: Award,
   orderBy: 'expiry_date',
   selectQuery: '*, organisation:organisations(name), certificate:certificates(name)',
@@ -364,6 +370,7 @@ export const organisationCertificatesConfig: MasterConfig = {
 export const organisationEmployeesConfig: MasterConfig = {
   title: 'Organisation Employees',
   table: 'organisation_employees',
+  imageAttachments: true,
   icon: IdCard,
   orderBy: 'full_name',
   selectQuery: '*, organisation:organisations(name, code), designation:designations(name)',
@@ -426,6 +433,7 @@ export const organisationEmployeesConfig: MasterConfig = {
 export const activityResourceRequirementsConfig: MasterConfig = {
   title: 'Activity Resource Requirements',
   table: 'activity_resource_requirements',
+  imageAttachments: true,
   icon: Package,
   orderBy: 'created_at',
   softDelete: false,
@@ -485,6 +493,7 @@ export const activityResourceRequirementsConfig: MasterConfig = {
 export const activityContractorAllocationsConfig: MasterConfig = {
   title: 'Activity Contractor Allocations',
   table: 'activity_contractor_allocations',
+  imageAttachments: true,
   icon: HardHat,
   orderBy: 'start_date',
   selectQuery:
@@ -549,6 +558,7 @@ export const activityContractorAllocationsConfig: MasterConfig = {
 export const workContractsConfig: MasterConfig = {
   title: 'Work Contracts',
   table: 'work_contracts',
+  imageAttachments: true,
   icon: FileSignature,
   orderBy: 'contract_date',
   selectQuery: '*, project:projects(name, code), stakeholder:stakeholders(name, code)',
@@ -612,6 +622,7 @@ export const workContractsConfig: MasterConfig = {
 export const workContractItemsConfig: MasterConfig = {
   title: 'Work Contract Items',
   table: 'work_contract_items',
+  imageAttachments: true,
   icon: ListOrdered,
   orderBy: 'created_at',
   softDelete: false,

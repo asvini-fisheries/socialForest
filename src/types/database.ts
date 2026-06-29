@@ -122,6 +122,7 @@ export interface Project {
   district: string | null;
   state: string | null;
   is_active: boolean;
+  image_url?: string | null;
   year?: Year;
   csr_partner?: CsrPartner;
   organisation?: Organisation;
