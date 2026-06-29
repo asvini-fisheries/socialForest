@@ -27,6 +27,25 @@ export function projectAreaParentText(row: Record<string, unknown>): string {
   return formatAreaRef(row.parent_area);
 }
 
+/** Fill parent_area from sibling rows when the self-join returns null. */
+export function enrichProjectAreaParents(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  const byId = new Map<string, { name: string; code?: string | null }>();
+  for (const row of rows) {
+    if (row.id) {
+      byId.set(String(row.id), {
+        name: String(row.name ?? ''),
+        code: row.code as string | null | undefined,
+      });
+    }
+  }
+
+  return rows.map((row) => {
+    if (row.parent_area || !row.parent_area_id) return row;
+    const parent = byId.get(String(row.parent_area_id));
+    return parent ? { ...row, parent_area: parent } : row;
+  });
+}
+
 export function projectActivityProjectText(row: Record<string, unknown>): string {
   return formatProjectFilterText(row.project);
 }

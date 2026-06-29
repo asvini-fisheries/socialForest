@@ -379,7 +379,7 @@ export const projectAreasConfig: MasterConfig = {
   icon: MapPin,
   orderBy: 'level',
   selectQuery:
-    '*, project:projects(name, code), parent_area:project_areas!parent_area_id(name, code)',
+    '*, project:projects(name, code), parent_area:parent_area_id(name, code)',
   searchKeys: ['name', 'code', 'description', 'project', 'parent_area'],
   columnFilters: [
     {
