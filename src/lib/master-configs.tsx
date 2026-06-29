@@ -18,7 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { ROLE_LABELS } from '@/types/database';
 import { formatProjectStatus } from '@/lib/projects';
-import { formatAreaRef, projectAreaParentText, projectAreaProjectText } from '@/lib/master-display';
+import { formatAreaRef, projectAreaParentText, projectAreaProjectText, projectActivityActivityKey, projectActivityActivityText, projectActivityAreaKey, projectActivityAreaText, projectActivityProjectText } from '@/lib/master-display';
 import type { MasterConfig } from '@/lib/master-types';
 
 const USER_ROLES = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -466,8 +466,32 @@ export const projectActivitiesConfig: MasterConfig = {
   icon: Activity,
   orderBy: 'planned_start_date',
   selectQuery:
-    '*, project:projects(name, code), activity:activities(name, code), project_area:project_areas(name, code)',
-  searchKeys: ['planned_quantity'],
+    '*, project:projects(name, code), activity:activities(id, name, code), project_area:project_areas(id, name, code)',
+  searchKeys: ['planned_quantity', 'project', 'activity', 'project_area'],
+  columnFilters: [
+    {
+      id: 'project',
+      label: 'Project',
+      placeholder: 'Filter by project…',
+      getValue: projectActivityProjectText,
+    },
+    {
+      id: 'area',
+      label: 'Project Area',
+      mode: 'multiselect',
+      placeholder: 'All areas',
+      getValue: projectActivityAreaText,
+      getKey: projectActivityAreaKey,
+    },
+    {
+      id: 'activity',
+      label: 'Activity',
+      mode: 'multiselect',
+      placeholder: 'All activities',
+      getValue: projectActivityActivityText,
+      getKey: projectActivityActivityKey,
+    },
+  ],
   fields: [
     {
       name: 'project_id',

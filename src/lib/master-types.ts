@@ -29,12 +29,17 @@ export interface MasterColumn<T> {
   render: (row: T) => ReactNode;
 }
 
-/** Per-column text filter shown above the grid */
+/** Per-column filter shown above the grid */
+export type MasterColumnFilterMode = 'text' | 'multiselect';
+
 export interface MasterColumnFilter {
   id: string;
   label: string;
   placeholder?: string;
+  mode?: MasterColumnFilterMode;
   getValue: (row: Record<string, unknown>) => string;
+  /** Stable match key for multiselect (defaults to getValue) */
+  getKey?: (row: Record<string, unknown>) => string;
 }
 
 export interface ImportColumnSpec {

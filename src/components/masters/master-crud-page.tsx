@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { MultiSelectFilter } from '@/components/ui/multi-select-filter';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DialogRoot, DialogContent } from '@/components/ui/dialog';
 import { MasterToolbar } from '@/components/masters/master-toolbar';
@@ -15,7 +16,8 @@ import { MasterImageField } from '@/components/masters/master-image-field';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { getMasterTableSpec } from '@/lib/master-registry-data';
-import { filterMasterRows } from '@/lib/master-registry';
+import { filterMasterRows, hasActiveColumnFilters } from '@/lib/master-registry';
+import { buildMasterFilterOptions } from '@/lib/master-display';
 import { getMasterImageField, masterTableSupportsImages, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
 import { masterApiFetch, parseMasterApiError } from '@/lib/masters-api-client';
 import { filterRowsByProject, getMasterProjectScope, apiProjectFilterColumn } from '@/lib/master-project-scope';
@@ -43,7 +45,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
 
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [search, setSearch] = useState('');
-  const [columnFilterValues, setColumnFilterValues] = useState<Record<string, string>>({});
+  const [columnFilterValues, setColumnFilterValues] = useState<Record<string, string | string[]>>({});
   const [logsOpen, setLogsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -88,6 +90,22 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
       ),
     [rows, search, searchKeys, config.columnFilters, columnFilterValues]
   );
+
+  const hasColumnFilters = useMemo(
+    () => hasActiveColumnFilters(config.columnFilters, columnFilterValues),
+    [config.columnFilters, columnFilterValues]
+  );
+
+  const filterOptionsById = useMemo(() => {
+    const map: Record<string, { value: string; label: string }[]> = {};
+    if (!config.columnFilters) return map;
+    for (const filter of config.columnFilters) {
+      if (filter.mode === 'multiselect') {
+        map[filter.id] = buildMasterFilterOptions(rows, filter);
+      }
+    }
+    return map;
+  }, [config.columnFilters, rows]);
 
   const projectScope = useMemo(() => getMasterProjectScope(config.table), [config.table]);
 
@@ -463,17 +481,34 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
 
         {config.columnFilters && config.columnFilters.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {config.columnFilters.map((filter) => (
-              <Input
-                key={filter.id}
-                label={filter.label}
-                placeholder={filter.placeholder || `Filter ${filter.label.toLowerCase()}…`}
-                value={columnFilterValues[filter.id] ?? ''}
-                onChange={(e) =>
-                  setColumnFilterValues((prev) => ({ ...prev, [filter.id]: e.target.value }))
-                }
-              />
-            ))}
+            {config.columnFilters.map((filter) =>
+              filter.mode === 'multiselect' ? (
+                <MultiSelectFilter
+                  key={filter.id}
+                  label={filter.label}
+                  placeholder={filter.placeholder || `All ${filter.label.toLowerCase()}`}
+                  options={filterOptionsById[filter.id] ?? []}
+                  value={
+                    Array.isArray(columnFilterValues[filter.id])
+                      ? (columnFilterValues[filter.id] as string[])
+                      : []
+                  }
+                  onChange={(next) =>
+                    setColumnFilterValues((prev) => ({ ...prev, [filter.id]: next }))
+                  }
+                />
+              ) : (
+                <Input
+                  key={filter.id}
+                  label={filter.label}
+                  placeholder={filter.placeholder || `Filter ${filter.label.toLowerCase()}…`}
+                  value={String(columnFilterValues[filter.id] ?? '')}
+                  onChange={(e) =>
+                    setColumnFilterValues((prev) => ({ ...prev, [filter.id]: e.target.value }))
+                  }
+                />
+              )
+            )}
           </div>
         )}
 
@@ -484,7 +519,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
               {config.title}
               <span className="text-sm font-normal text-gray-400 ml-2">
                 ({filteredRows.length}
-                {search ? ` of ${rows.length}` : ''})
+                {search || hasColumnFilters ? ` of ${rows.length}` : ''})
               </span>
             </CardTitle>
           </CardHeader>

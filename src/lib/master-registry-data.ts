@@ -304,9 +304,9 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     table: 'project_activities',
     orderBy: 'planned_start_date',
     selectQuery:
-      '*, project:projects(name, code), activity:activities(name, code), project_area:project_areas(name, code)',
+      '*, project:projects(name, code), activity:activities(id, name, code), project_area:project_areas(id, name, code)',
     importEnabled: true,
-    searchKeys: ['planned_quantity'],
+    searchKeys: ['planned_quantity', 'project', 'activity', 'project_area'],
     importColumns: [
       {
         key: 'project_id',
