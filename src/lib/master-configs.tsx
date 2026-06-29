@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { ROLE_LABELS } from '@/types/database';
 import { formatProjectStatus } from '@/lib/projects';
+import { formatAreaRef, projectAreaParentText, projectAreaProjectText } from '@/lib/master-display';
 import type { MasterConfig } from '@/lib/master-types';
 
 const USER_ROLES = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -379,7 +380,33 @@ export const projectAreasConfig: MasterConfig = {
   orderBy: 'level',
   selectQuery:
     '*, project:projects(name, code), parent_area:project_areas!parent_area_id(name, code)',
-  searchKeys: ['name', 'code', 'description'],
+  searchKeys: ['name', 'code', 'description', 'project', 'parent_area'],
+  columnFilters: [
+    {
+      id: 'project',
+      label: 'Project',
+      placeholder: 'Filter by project…',
+      getValue: projectAreaProjectText,
+    },
+    {
+      id: 'parent',
+      label: 'Parent',
+      placeholder: 'Filter by parent area…',
+      getValue: projectAreaParentText,
+    },
+    {
+      id: 'code',
+      label: 'Code',
+      placeholder: 'Filter by code…',
+      getValue: (row) => String(row.code ?? ''),
+    },
+    {
+      id: 'area',
+      label: 'Area',
+      placeholder: 'Filter by area name…',
+      getValue: (row) => String(row.name ?? ''),
+    },
+  ],
   fields: [
     {
       name: 'project_id',
@@ -407,10 +434,7 @@ export const projectAreasConfig: MasterConfig = {
     {
       key: 'project',
       header: 'Project',
-      render: (r) => {
-        const project = r.project as { name?: string; code?: string } | null;
-        return project ? `${project.name}${project.code ? ` (${project.code})` : ''}` : '—';
-      },
+      render: (r) => formatAreaRef(r.project) || '—',
     },
     { key: 'level', header: 'Level', render: (r) => String(r.level) },
     { key: 'name', header: 'Area', render: (r) => String(r.name) },
@@ -418,10 +442,7 @@ export const projectAreasConfig: MasterConfig = {
     {
       key: 'parent',
       header: 'Parent',
-      render: (r) => {
-        const parent = r.parent_area as { name?: string; code?: string } | null;
-        return parent ? `${parent.name}${parent.code ? ` (${parent.code})` : ''}` : '—';
-      },
+      render: (r) => formatAreaRef(r.parent_area) || '—',
     },
     {
       key: 'land',
