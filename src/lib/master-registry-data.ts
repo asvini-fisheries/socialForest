@@ -277,7 +277,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
         header: 'Project',
         type: 'select',
         required: true,
-        resolveFrom: { table: 'projects', valueKey: 'id', labelKey: 'name' },
+        resolveFrom: { table: 'projects', valueKey: 'id', labelKey: 'name', labelSuffixKey: 'code' },
       },
       {
         key: 'parent_area_id',

@@ -19,6 +19,11 @@ export interface ImportResult {
 
 const lookupCache = new Map<string, Map<string, string>>();
 
+/** Trim + lowercase so Excel values match DB labels with stray spaces. */
+function normalizeLookupKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 async function getLookupMap(
   service: SupabaseClient,
   spec: NonNullable<ImportColumnSpec['resolveFrom']>
@@ -30,11 +35,14 @@ async function getLookupMap(
   const map = new Map<string, string>();
   for (const row of data || []) {
     const r = row as Record<string, string>;
-    const label = spec.labelSuffixKey
-      ? `${r[spec.labelKey]} (${r[spec.labelSuffixKey]})`.toLowerCase()
-      : String(r[spec.labelKey]).toLowerCase();
-    map.set(label, r[spec.valueKey]);
-    map.set(String(r[spec.labelKey]).toLowerCase(), r[spec.valueKey]);
+    const rawLabel = spec.labelSuffixKey
+      ? `${r[spec.labelKey]} (${r[spec.labelSuffixKey]})`
+      : String(r[spec.labelKey] ?? '');
+    map.set(normalizeLookupKey(rawLabel), r[spec.valueKey]);
+    map.set(normalizeLookupKey(String(r[spec.labelKey] ?? '')), r[spec.valueKey]);
+    if (spec.labelSuffixKey && r[spec.labelSuffixKey]) {
+      map.set(normalizeLookupKey(String(r[spec.labelSuffixKey])), r[spec.valueKey]);
+    }
   }
   lookupCache.set(cacheKey, map);
   return map;
@@ -153,7 +161,7 @@ export async function importMasterRows(
         payload[col.key] = num;
       } else if (col.resolveFrom) {
         const lookup = await getLookupMap(service, col.resolveFrom);
-        const id = lookup.get(raw.toLowerCase());
+        const id = lookup.get(normalizeLookupKey(raw));
         if (!id) {
           errors.push({
             row: excelRow,
