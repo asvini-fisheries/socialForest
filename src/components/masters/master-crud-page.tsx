@@ -21,7 +21,6 @@ import { buildMasterFilterOptions } from '@/lib/master-display';
 import { getMasterImageField, masterTableSupportsImages, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
 import { masterApiFetch, parseMasterApiError } from '@/lib/masters-api-client';
 import { filterRowsByProject, getMasterProjectScope, apiProjectFilterColumn } from '@/lib/master-project-scope';
-import { ProjectSelector } from '@/components/layout/project-selector';
 import type { MasterConfig, MasterField } from '@/lib/master-types';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -434,22 +433,19 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">{config.title}</h2>
             <p className="text-gray-500 mt-1">
               {isAdmin ? 'Search, import/export, and manage master records' : 'View master data (read only)'}
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            <ProjectSelector label="Project" className="w-full sm:w-72" />
-            {isAdmin && (
-              <Button onClick={openCreate}>
-                <Plus className="w-4 h-4" />
-                Add New
-              </Button>
-            )}
-          </div>
+          {isAdmin && (
+            <Button onClick={openCreate}>
+              <Plus className="w-4 h-4" />
+              Add New
+            </Button>
+          )}
         </div>
 
         {error && (

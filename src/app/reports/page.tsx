@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/auth-context';
 import {
   BarChart3,
   ClipboardList,
@@ -48,16 +47,12 @@ const REPORT_SECTIONS = [
 ];
 
 export default function ReportsPage() {
-  const { selectedProject, selectedYear } = useAuth();
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-500 mt-1">
-            {selectedProject?.name} — {selectedYear?.year_label}
-          </p>
+          <p className="text-gray-500 mt-1">Generate and export project reports</p>
         </div>
 
         {REPORT_SECTIONS.map((section) => (

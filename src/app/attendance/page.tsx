@@ -127,9 +127,7 @@ export default function AttendancePage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Daily Attendance</h1>
-            <p className="text-gray-500 mt-1">
-              {selectedProject?.name} — mark organisation employee attendance
-            </p>
+            <p className="text-gray-500 mt-1">Mark organisation employee attendance</p>
           </div>
           <div className="flex items-center gap-2">
             <input

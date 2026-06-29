@@ -124,7 +124,6 @@ export function Sidebar() {
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-gray-200">
         <Logo size="sm" className="w-full max-w-[160px]" />
-        <p className="text-xs text-gray-500 mt-2">CSR Agroforestry Management</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
