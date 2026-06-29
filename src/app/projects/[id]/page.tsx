@@ -7,6 +7,7 @@ import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
+import { ProjectAreasTree } from '@/components/projects/project-areas-tree';
 import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
 import type { Project, ProjectArea } from '@/types/database';
@@ -72,8 +73,6 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     loadProject();
   }, [loadProject]);
-
-  const areasByLevel = [1, 2, 3].map((level) => areas.filter((a) => a.level === level));
 
   return (
     <DashboardLayout>
@@ -199,40 +198,7 @@ export default function ProjectDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {areas.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-6">No areas defined yet</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {areasByLevel.map((levelAreas, idx) =>
-                        levelAreas.length > 0 ? (
-                          <div key={idx}>
-                            <p className="text-xs font-semibold text-gray-400 uppercase mb-2">
-                              Level {idx + 1}
-                            </p>
-                            <div className="space-y-2">
-                              {levelAreas.map((area) => (
-                                <div
-                                  key={area.id}
-                                  className="flex items-center justify-between p-3 rounded-lg bg-gray-50 text-sm"
-                                >
-                                  <div>
-                                    <p className="font-medium text-gray-900">{area.name}</p>
-                                    {area.code && (
-                                      <p className="text-gray-500 text-xs">{area.code}</p>
-                                    )}
-                                  </div>
-                                  <div className="text-right text-gray-600">
-                                    <p>{area.land_area_acres} ac</p>
-                                    <p className="text-xs">{formatNumber(area.trees_planned)} trees</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null
-                      )}
-                    </div>
-                  )}
+                  <ProjectAreasTree areas={areas} />
                 </CardContent>
               </Card>
             </div>
