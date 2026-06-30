@@ -193,33 +193,36 @@ export default function DailyActivitiesPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 text-left text-gray-500">
-                      <th className="py-3 pr-4 font-medium">Date</th>
-                      <th className="py-3 pr-4 font-medium">Project Area</th>
-                      <th className="py-3 pr-4 font-medium">Activity</th>
-                      <th className="py-3 pr-4 font-medium text-right">Amount</th>
-                      <th className="py-3 font-medium text-right w-24">Actions</th>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-500">Date</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500">Project Area</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500">Activity</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-500">Amount</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-500 w-24">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedEntries.map((entry) => (
                       <tr
                         key={entry.id}
-                        className="border-b border-gray-100 hover:bg-gray-50/80"
+                        className="border-b border-gray-100 hover:bg-gray-50"
                       >
-                        <td className="py-3 pr-4 text-gray-900 whitespace-nowrap">
+                        <td className="py-3 px-4 text-gray-900 whitespace-nowrap">
                           {formatDate(entry.activity_date)}
                         </td>
-                        <td className="py-3 pr-4 text-gray-700">
+                        <td className="py-3 px-4 text-gray-700">
                           {entry.project_area?.name || '—'}
                         </td>
-                        <td className="py-3 pr-4 text-gray-900 font-medium">
-                          {entry.project_activity?.activity?.name || '—'}
+                        <td className="py-3 px-4 text-gray-900">
+                          <p className="font-medium">{entry.project_activity?.activity?.name || '—'}</p>
+                          {entry.remarks && (
+                            <p className="text-xs text-gray-500 mt-0.5">{entry.remarks}</p>
+                          )}
                         </td>
-                        <td className="py-3 pr-4 text-right text-gray-900 tabular-nums">
+                        <td className="py-3 px-4 text-right text-gray-900 tabular-nums">
                           {activityAmount(entry)}
                         </td>
-                        <td className="py-3 text-right">
+                        <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="sm" onClick={() => openEdit(entry)}>
                               <Pencil className="w-4 h-4" />
