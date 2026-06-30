@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,13 @@ type ActivityEntry = DailyActivityUpdate & {
     resource?: { name: string };
   }[];
 };
+
+function activityAmount(entry: ActivityEntry): string {
+  if (entry.quantity_completed != null) {
+    return formatNumber(entry.quantity_completed);
+  }
+  return '—';
+}
 
 export default function DailyActivitiesPage() {
   const { selectedProject } = useAuth();
@@ -62,6 +69,22 @@ export default function DailyActivitiesPage() {
   const todayEntries = entries.filter((e) => e.activity_date === today);
   const imageCount = entries.reduce((sum, e) => sum + (e.images?.length || 0), 0);
   const resourceCount = entries.reduce((sum, e) => sum + (e.resources_used?.length || 0), 0);
+
+  const sortedEntries = useMemo(
+    () =>
+      [...entries].sort((a, b) => {
+        const dateCmp = b.activity_date.localeCompare(a.activity_date);
+        if (dateCmp !== 0) return dateCmp;
+        const areaA = a.project_area?.name || '';
+        const areaB = b.project_area?.name || '';
+        const areaCmp = areaA.localeCompare(areaB);
+        if (areaCmp !== 0) return areaCmp;
+        const actA = a.project_activity?.activity?.name || '';
+        const actB = b.project_activity?.activity?.name || '';
+        return actA.localeCompare(actB);
+      }),
+    [entries]
+  );
 
   function openCreate() {
     setEditing(null);
@@ -167,56 +190,54 @@ export default function DailyActivitiesPage() {
                 description="Click New Entry to record work progress with images and resource usage"
               />
             ) : (
-              <div className="space-y-3">
-                {entries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex flex-wrap items-start justify-between gap-3 p-4 rounded-lg border border-gray-100 hover:border-emerald-200 transition-colors"
-                  >
-                    <div className="space-y-1 min-w-0">
-                      <p className="font-medium text-gray-900">
-                        {entry.project_activity?.activity?.name || 'Activity'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {formatDate(entry.activity_date)}
-                        {entry.stakeholder?.name ? ` · ${entry.stakeholder.name}` : ''}
-                        {entry.project_area?.name ? ` · ${entry.project_area.name}` : ''}
-                      </p>
-                      {entry.quantity_completed != null && (
-                        <p className="text-sm text-emerald-700">
-                          Qty: {formatNumber(entry.quantity_completed)}
-                        </p>
-                      )}
-                      {entry.remarks && <p className="text-sm text-gray-600">{entry.remarks}</p>}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {(entry.images?.length || 0) > 0 && (
-                          <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                            {entry.images!.length} image{entry.images!.length !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                        {(entry.resources_used?.length || 0) > 0 && (
-                          <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
-                            {entry.resources_used!.length} resource
-                            {entry.resources_used!.length !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(entry)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600 hover:bg-red-50"
-                        onClick={() => handleDelete(entry)}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-left text-gray-500">
+                      <th className="py-3 pr-4 font-medium">Date</th>
+                      <th className="py-3 pr-4 font-medium">Project Area</th>
+                      <th className="py-3 pr-4 font-medium">Activity</th>
+                      <th className="py-3 pr-4 font-medium text-right">Amount</th>
+                      <th className="py-3 font-medium text-right w-24">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedEntries.map((entry) => (
+                      <tr
+                        key={entry.id}
+                        className="border-b border-gray-100 hover:bg-gray-50/80"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                        <td className="py-3 pr-4 text-gray-900 whitespace-nowrap">
+                          {formatDate(entry.activity_date)}
+                        </td>
+                        <td className="py-3 pr-4 text-gray-700">
+                          {entry.project_area?.name || '—'}
+                        </td>
+                        <td className="py-3 pr-4 text-gray-900 font-medium">
+                          {entry.project_activity?.activity?.name || '—'}
+                        </td>
+                        <td className="py-3 pr-4 text-right text-gray-900 tabular-nums">
+                          {activityAmount(entry)}
+                        </td>
+                        <td className="py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(entry)}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:bg-red-50"
+                              onClick={() => handleDelete(entry)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>

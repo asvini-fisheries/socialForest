@@ -19,8 +19,14 @@ export function buildProjectAreaTree(areas: ProjectArea[]): ProjectArea[] {
     }
   }
 
+  const sortByCode = (a: ProjectArea, b: ProjectArea) => {
+    const codeA = (a.code || a.name || '').toLowerCase();
+    const codeB = (b.code || b.name || '').toLowerCase();
+    return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+  };
+
   const sortNodes = (list: ProjectArea[]) => {
-    list.sort((a, b) => a.name.localeCompare(b.name));
+    list.sort(sortByCode);
     list.forEach((node) => {
       if (node.children?.length) sortNodes(node.children);
     });
