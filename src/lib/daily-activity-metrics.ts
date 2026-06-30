@@ -20,3 +20,11 @@ export function entryAmount(entry: DailyActivityMetricRow): number {
     return sum + qty * rate;
   }, 0);
 }
+
+export function sumActivityQuantity(entries: DailyActivityMetricRow[]): number {
+  return entries.reduce((sum, entry) => sum + entryQuantity(entry), 0);
+}
+
+export function sumActivityAmount(entries: DailyActivityMetricRow[]): number {
+  return entries.reduce((sum, entry) => sum + entryAmount(entry), 0);
+}

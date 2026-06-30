@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchDailyActivities } from '@/lib/daily-activities-client';
+import { sumActivityAmount, sumActivityQuantity } from '@/lib/daily-activity-metrics';
 import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
 
 export default function ProjectDetailPage() {
@@ -90,6 +91,9 @@ export default function ProjectDetailPage() {
     () => buildRolledUpSummariesByArea(areas, activityEntries),
     [areas, activityEntries]
   );
+
+  const treesPlanted = useMemo(() => sumActivityQuantity(activityEntries), [activityEntries]);
+  const budgetActual = useMemo(() => sumActivityAmount(activityEntries), [activityEntries]);
 
   useEffect(() => {
     loadProject();
@@ -156,19 +160,56 @@ export default function ProjectDetailPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Trees Planned', value: formatNumber(project.total_trees_planned), icon: TreePine, color: 'text-emerald-600 bg-emerald-50' },
-                { label: 'Land Area', value: `${project.total_land_area_acres} acres`, icon: MapPin, color: 'text-blue-600 bg-blue-50' },
-                { label: 'Budget', value: formatCurrency(project.budget_amount), icon: IndianRupee, color: 'text-amber-600 bg-amber-50' },
-                { label: 'Financial Year', value: project.year?.year_label || '—', icon: Calendar, color: 'text-purple-600 bg-purple-50' },
+                {
+                  label: 'Trees',
+                  lines: [
+                    { caption: 'Planned', value: formatNumber(project.total_trees_planned) },
+                    { caption: 'Planted', value: formatNumber(treesPlanted) },
+                  ],
+                  icon: TreePine,
+                  color: 'text-emerald-600 bg-emerald-50',
+                },
+                {
+                  label: 'Land Area',
+                  lines: [{ caption: '', value: `${project.total_land_area_acres} acres` }],
+                  icon: MapPin,
+                  color: 'text-blue-600 bg-blue-50',
+                },
+                {
+                  label: 'Amount',
+                  lines: [
+                    { caption: 'Budget', value: formatCurrency(project.budget_amount) },
+                    { caption: 'Actual', value: formatCurrency(budgetActual) },
+                  ],
+                  icon: IndianRupee,
+                  color: 'text-amber-600 bg-amber-50',
+                },
+                {
+                  label: 'Financial Year',
+                  lines: [{ caption: '', value: project.year?.year_label || '—' }],
+                  icon: Calendar,
+                  color: 'text-purple-600 bg-purple-50',
+                },
               ].map((stat) => (
                 <Card key={stat.label}>
                   <CardContent className="p-4 flex items-center gap-4">
                     <div className={`p-3 rounded-xl ${stat.color}`}>
                       <stat.icon className="w-5 h-5" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm text-gray-500">{stat.label}</p>
-                      <p className="text-lg font-bold text-gray-900">{stat.value}</p>
+                      {stat.lines.map((line) => (
+                        <div key={line.caption || 'main'} className="mt-0.5">
+                          {line.caption ? (
+                            <p className="text-sm text-gray-900">
+                              <span className="text-gray-500">{line.caption}: </span>
+                              <span className="font-bold">{line.value}</span>
+                            </p>
+                          ) : (
+                            <p className="text-lg font-bold text-gray-900">{line.value}</p>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
