@@ -18,7 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { ROLE_LABELS } from '@/types/database';
 import { formatProjectStatus } from '@/lib/projects';
-import { formatAreaRef, formatProjectCode, projectAreaParentText, projectAreaProjectText, projectActivityActivityKey, projectActivityActivityText, projectActivityAreaKey, projectActivityAreaText, projectActivityProjectText } from '@/lib/master-display';
+import { formatAreaRef, formatProjectCode, projectAreaParentText, projectAreaProjectText, projectActivityActivityKey, projectActivityActivityText, projectActivityAreaKey, projectActivityAreaText, projectActivityProjectText, resourceCategoryKey, resourceCategoryText, resourceTreeSpeciesKey, resourceTreeSpeciesText } from '@/lib/master-display';
 import type { MasterConfig } from '@/lib/master-types';
 
 const USER_ROLES = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -258,6 +258,29 @@ export const resourcesConfig: MasterConfig = {
   icon: Package,
   orderBy: 'name',
   selectQuery: '*, resource_category:resource_categories(name, category_type)',
+  searchKeys: ['name', 'code', 'description', 'resource_category'],
+  columnFilters: [
+    {
+      id: 'tree',
+      label: 'Tree Species',
+      mode: 'multiselect',
+      placeholder: 'All',
+      staticOptions: [
+        { value: 'yes', label: 'Yes' },
+        { value: 'no', label: 'No' },
+      ],
+      getValue: resourceTreeSpeciesText,
+      getKey: resourceTreeSpeciesKey,
+    },
+    {
+      id: 'category',
+      label: 'Category',
+      mode: 'multiselect',
+      placeholder: 'All categories',
+      getValue: resourceCategoryText,
+      getKey: resourceCategoryKey,
+    },
+  ],
   fields: [
     { name: 'name', label: 'Name', type: 'text', required: true },
     { name: 'code', label: 'Code', type: 'text' },

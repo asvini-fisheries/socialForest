@@ -40,6 +40,8 @@ export interface MasterColumnFilter {
   getValue: (row: Record<string, unknown>) => string;
   /** Stable match key for multiselect (defaults to getValue) */
   getKey?: (row: Record<string, unknown>) => string;
+  /** Fixed choices for multiselect filters (e.g. Yes / No) */
+  staticOptions?: { value: string; label: string }[];
 }
 
 export interface ImportColumnSpec {

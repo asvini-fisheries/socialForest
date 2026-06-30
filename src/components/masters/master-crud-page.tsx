@@ -100,7 +100,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     if (!config.columnFilters) return map;
     for (const filter of config.columnFilters) {
       if (filter.mode === 'multiselect') {
-        map[filter.id] = buildMasterFilterOptions(rows, filter);
+        map[filter.id] = filter.staticOptions ?? buildMasterFilterOptions(rows, filter);
       }
     }
     return map;

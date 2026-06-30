@@ -71,6 +71,24 @@ export function projectActivityAreaKey(row: Record<string, unknown>): string {
   return area?.id ?? String(row.project_area_id);
 }
 
+export function resourceTreeSpeciesText(row: Record<string, unknown>): string {
+  return row.is_tree_species ? 'Yes' : 'No';
+}
+
+export function resourceTreeSpeciesKey(row: Record<string, unknown>): string {
+  return row.is_tree_species ? 'yes' : 'no';
+}
+
+export function resourceCategoryText(row: Record<string, unknown>): string {
+  const cat = row.resource_category as { name?: string; category_type?: string } | null;
+  if (!cat?.name) return '—';
+  return cat.category_type ? `${cat.name} (${cat.category_type})` : cat.name;
+}
+
+export function resourceCategoryKey(row: Record<string, unknown>): string {
+  return String(row.category_id ?? '');
+}
+
 /** Build distinct multiselect options from loaded rows */
 export function buildMasterFilterOptions(
   rows: Record<string, unknown>[],
