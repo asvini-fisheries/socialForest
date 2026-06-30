@@ -10,6 +10,7 @@ import { DailyActivityFormDialog } from '@/components/daily-activities/daily-act
 import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { entryAmount, entryQuantity } from '@/lib/daily-activity-metrics';
+import { formatAreaRef } from '@/lib/master-display';
 import type { DailyActivityUpdate } from '@/types/database';
 import { Plus, Activity, IndianRupee, Hash, Loader2, Pencil, Trash2, ListOrdered } from 'lucide-react';
 
@@ -19,7 +20,11 @@ type ActivityEntry = DailyActivityUpdate & {
     activity?: { name: string };
   };
   stakeholder?: { name: string };
-  project_area?: { name: string } | null;
+  project_area?: {
+    name: string;
+    code?: string | null;
+    parent_area?: { name: string; code?: string | null } | null;
+  } | null;
   images?: { id: string; image_url: string }[];
   resources_used?: {
     id: string;
@@ -33,6 +38,7 @@ type ActivityEntry = DailyActivityUpdate & {
 type ActivityFilters = {
   dateFrom: string;
   dateTo: string;
+  parentArea: string;
   projectArea: string;
   activity: string;
 };
@@ -40,9 +46,14 @@ type ActivityFilters = {
 const EMPTY_FILTERS: ActivityFilters = {
   dateFrom: '',
   dateTo: '',
+  parentArea: '',
   projectArea: '',
   activity: '',
 };
+
+function entryParentAreaText(entry: ActivityEntry): string {
+  return formatAreaRef(entry.project_area?.parent_area) || '';
+}
 
 function hasActiveFilters(filters: ActivityFilters): boolean {
   return Object.values(filters).some((v) => v.trim() !== '');
@@ -79,6 +90,7 @@ export default function DailyActivitiesPage() {
   }, [loadEntries]);
 
   const filteredEntries = useMemo(() => {
+    const parentQ = filters.parentArea.trim().toLowerCase();
     const areaQ = filters.projectArea.trim().toLowerCase();
     const activityQ = filters.activity.trim().toLowerCase();
 
@@ -86,9 +98,15 @@ export default function DailyActivitiesPage() {
       if (filters.dateFrom && entry.activity_date < filters.dateFrom) return false;
       if (filters.dateTo && entry.activity_date > filters.dateTo) return false;
 
+      if (parentQ) {
+        const parentText = entryParentAreaText(entry).toLowerCase();
+        if (!parentText.includes(parentQ)) return false;
+      }
+
       if (areaQ) {
         const areaName = entry.project_area?.name?.toLowerCase() || '';
-        if (!areaName.includes(areaQ)) return false;
+        const areaCode = entry.project_area?.code?.toLowerCase() || '';
+        if (!areaName.includes(areaQ) && !areaCode.includes(areaQ)) return false;
       }
 
       if (activityQ) {
@@ -105,6 +123,8 @@ export default function DailyActivitiesPage() {
       [...filteredEntries].sort((a, b) => {
         const dateCmp = b.activity_date.localeCompare(a.activity_date);
         if (dateCmp !== 0) return dateCmp;
+        const parentCmp = entryParentAreaText(a).localeCompare(entryParentAreaText(b));
+        if (parentCmp !== 0) return parentCmp;
         const areaA = a.project_area?.name || '';
         const areaB = b.project_area?.name || '';
         const areaCmp = areaA.localeCompare(areaB);
@@ -234,7 +254,7 @@ export default function DailyActivitiesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <Input
                 label="Date from"
                 type="date"
@@ -246,6 +266,12 @@ export default function DailyActivitiesPage() {
                 type="date"
                 value={filters.dateTo}
                 onChange={(e) => setFilter('dateTo', e.target.value)}
+              />
+              <Input
+                label="Parent Area"
+                placeholder="Filter by parent…"
+                value={filters.parentArea}
+                onChange={(e) => setFilter('parentArea', e.target.value)}
               />
               <Input
                 label="Project Area"
@@ -284,6 +310,7 @@ export default function DailyActivitiesPage() {
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Date</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500">Parent Area</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Project Area</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Activity</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500">Quantity</th>
@@ -302,6 +329,9 @@ export default function DailyActivitiesPage() {
                         >
                           <td className="py-3 px-4 text-gray-900 whitespace-nowrap">
                             {formatDate(entry.activity_date)}
+                          </td>
+                          <td className="py-3 px-4 text-gray-700">
+                            {entryParentAreaText(entry) || '—'}
                           </td>
                           <td className="py-3 px-4 text-gray-700">
                             {entry.project_area?.name || '—'}
@@ -339,7 +369,7 @@ export default function DailyActivitiesPage() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                      <td className="py-3 px-4 text-gray-900" colSpan={3}>
+                      <td className="py-3 px-4 text-gray-900" colSpan={4}>
                         Totals ({formatNumber(totals.entries)} entries)
                       </td>
                       <td className="py-3 px-4 text-right text-gray-900 tabular-nums">
