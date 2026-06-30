@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
 import { entryAmount, entryQuantity } from '@/lib/daily-activity-metrics';
 import {
-  buildDirectSummariesByArea,
   type DailyActivityAreaRow,
 } from '@/lib/project-activity-summaries';
 import { ProjectAreaActivitySummaryTable } from '@/components/projects/project-area-activity-summary';
@@ -57,10 +56,6 @@ export default function DashboardPage() {
     loadActivityData();
   }, [loadActivityData]);
 
-  const activitySummaries = useMemo(
-    () => buildDirectSummariesByArea(areas, activityEntries),
-    [areas, activityEntries]
-  );
 
   const recentEntries = useMemo(
     () =>
@@ -215,7 +210,7 @@ export default function DashboardPage() {
                   Loading summaries...
                 </div>
               ) : (
-                <ProjectAreaActivitySummaryTable summaries={activitySummaries} />
+                <ProjectAreaActivitySummaryTable areas={areas} entries={activityEntries} />
               )}
             </CardContent>
           </Card>

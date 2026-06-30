@@ -13,10 +13,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
 import type { Project, ProjectArea } from '@/types/database';
 import type { DailyActivityAreaRow } from '@/lib/project-activity-summaries';
-import {
-  buildDirectSummariesByArea,
-  buildRolledUpSummariesByArea,
-} from '@/lib/project-activity-summaries';
+import { buildRolledUpSummariesByArea } from '@/lib/project-activity-summaries';
 import {
   ArrowLeft,
   TreePine,
@@ -91,10 +88,6 @@ export default function ProjectDetailPage() {
 
   const rolledUpSummaries = useMemo(
     () => buildRolledUpSummariesByArea(areas, activityEntries),
-    [areas, activityEntries]
-  );
-  const directSummaries = useMemo(
-    () => buildDirectSummariesByArea(areas, activityEntries),
     [areas, activityEntries]
   );
 
@@ -244,7 +237,7 @@ export default function ProjectDetailPage() {
                     {activityError}
                   </div>
                 )}
-                <ProjectAreaActivitySummaryTable summaries={directSummaries} />
+                <ProjectAreaActivitySummaryTable areas={areas} entries={activityEntries} />
               </CardContent>
             </Card>
           </>
