@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { DailyActivityFormDialog } from '@/components/daily-activities/daily-activity-form-dialog';
 import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
+import { entryAmount, entryQuantity } from '@/lib/daily-activity-metrics';
 import type { DailyActivityUpdate } from '@/types/database';
 import { Plus, Activity, IndianRupee, Hash, Loader2, Pencil, Trash2, ListOrdered } from 'lucide-react';
 
@@ -42,18 +43,6 @@ const EMPTY_FILTERS: ActivityFilters = {
   projectArea: '',
   activity: '',
 };
-
-function entryQuantity(entry: ActivityEntry): number {
-  return Number(entry.quantity_completed) || 0;
-}
-
-function entryAmount(entry: ActivityEntry): number {
-  return (entry.resources_used || []).reduce((sum, row) => {
-    const qty = Number(row.quantity_used) || 0;
-    const rate = Number(row.unit_rate) || 0;
-    return sum + qty * rate;
-  }, 0);
-}
 
 function hasActiveFilters(filters: ActivityFilters): boolean {
   return Object.values(filters).some((v) => v.trim() !== '');

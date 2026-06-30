@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/sidebar';
@@ -8,9 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
 import { ProjectAreasTree } from '@/components/projects/project-areas-tree';
+import { ProjectAreaActivitySummaryTable } from '@/components/projects/project-area-activity-summary';
 import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
 import type { Project, ProjectArea } from '@/types/database';
+import type { DailyActivityAreaRow } from '@/lib/project-activity-summaries';
+import {
+  buildDirectSummariesByArea,
+  buildRolledUpSummariesByArea,
+} from '@/lib/project-activity-summaries';
 import {
   ArrowLeft,
   TreePine,
@@ -21,6 +27,7 @@ import {
   Loader2,
   Layers,
   Pencil,
+  Activity,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
@@ -32,6 +39,7 @@ export default function ProjectDetailPage() {
   const isAdmin = user?.role === 'admin';
   const [project, setProject] = useState<Project | null>(null);
   const [areas, setAreas] = useState<ProjectArea[]>([]);
+  const [activityEntries, setActivityEntries] = useState<DailyActivityAreaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
@@ -42,7 +50,7 @@ export default function ProjectDetailPage() {
     setError('');
     const supabase = createClient();
 
-    const [projectRes, areasRes] = await Promise.all([
+    const [projectRes, areasRes, activitiesRes] = await Promise.all([
       supabase
         .from('projects')
         .select(
@@ -57,6 +65,14 @@ export default function ProjectDetailPage() {
         .eq('is_active', true)
         .order('level')
         .order('name'),
+      supabase
+        .from('daily_activity_updates')
+        .select(
+          `project_area_id, quantity_completed,
+          project_activity:project_activities(activity:activities(name)),
+          resources_used:daily_activity_resources_used(quantity_used, unit_rate)`
+        )
+        .eq('project_id', id),
     ]);
 
     if (projectRes.error) {
@@ -67,8 +83,18 @@ export default function ProjectDetailPage() {
 
     setProject(projectRes.data as Project);
     setAreas((areasRes.data as ProjectArea[]) || []);
+    setActivityEntries((activitiesRes.data as DailyActivityAreaRow[]) || []);
     setLoading(false);
   }, [id]);
+
+  const rolledUpSummaries = useMemo(
+    () => buildRolledUpSummariesByArea(areas, activityEntries),
+    [areas, activityEntries]
+  );
+  const directSummaries = useMemo(
+    () => buildDirectSummariesByArea(areas, activityEntries),
+    [areas, activityEntries]
+  );
 
   useEffect(() => {
     loadProject();
@@ -198,10 +224,22 @@ export default function ProjectDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ProjectAreasTree areas={areas} />
+                  <ProjectAreasTree areas={areas} activitySummaries={rolledUpSummaries} />
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-emerald-600" />
+                  Activities by Project Area
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ProjectAreaActivitySummaryTable summaries={directSummaries} />
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
