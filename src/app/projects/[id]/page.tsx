@@ -30,6 +30,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { fetchDailyActivities } from '@/lib/daily-activities-client';
 import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
 
 export default function ProjectDetailPage() {
@@ -42,15 +43,17 @@ export default function ProjectDetailPage() {
   const [activityEntries, setActivityEntries] = useState<DailyActivityAreaRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activityError, setActivityError] = useState('');
   const [editOpen, setEditOpen] = useState(false);
 
   const loadProject = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     setError('');
+    setActivityError('');
     const supabase = createClient();
 
-    const [projectRes, areasRes, activitiesRes] = await Promise.all([
+    const [projectRes, areasRes] = await Promise.all([
       supabase
         .from('projects')
         .select(
@@ -65,7 +68,6 @@ export default function ProjectDetailPage() {
         .eq('is_active', true)
         .order('level')
         .order('name'),
-      fetch(`/api/daily-activities?project_id=${encodeURIComponent(id)}`),
     ]);
 
     if (projectRes.error) {
@@ -75,9 +77,10 @@ export default function ProjectDetailPage() {
     }
 
     let activityRows: DailyActivityAreaRow[] = [];
-    if (activitiesRes.ok) {
-      const activitiesJson = (await activitiesRes.json()) as { data?: DailyActivityAreaRow[] };
-      activityRows = activitiesJson.data || [];
+    try {
+      activityRows = (await fetchDailyActivities(id)) as DailyActivityAreaRow[];
+    } catch (err) {
+      setActivityError(err instanceof Error ? err.message : 'Failed to load activities');
     }
 
     setProject(projectRes.data as Project);
@@ -236,6 +239,11 @@ export default function ProjectDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {activityError && (
+                  <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-sm">
+                    {activityError}
+                  </div>
+                )}
                 <ProjectAreaActivitySummaryTable summaries={directSummaries} />
               </CardContent>
             </Card>

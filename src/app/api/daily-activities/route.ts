@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'project_id required' }, { status: 400 });
   }
 
-  const auth = await requireProjectAccess(projectId);
+  const auth = await requireProjectAccess(projectId, request);
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const auth = await requireProjectAccess(project_id);
+  const auth = await requireProjectAccess(project_id, request);
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

@@ -21,6 +21,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { fetchDailyActivities } from '@/lib/daily-activities-client';
 import { createClient } from '@/lib/supabase/client';
 import type { ProjectArea } from '@/types/database';
 
@@ -38,23 +39,17 @@ export default function DashboardPage() {
     }
     setLoadingActivities(true);
     const supabase = createClient();
-    const [areasRes, activitiesRes] = await Promise.all([
+    const [areasRes, activityRows] = await Promise.all([
       supabase
         .from('project_areas')
         .select('*')
         .eq('project_id', selectedProject.id)
         .eq('is_active', true),
-      fetch(`/api/daily-activities?project_id=${encodeURIComponent(selectedProject.id)}`),
+      fetchDailyActivities(selectedProject.id).catch(() => []),
     ]);
 
     setAreas((areasRes.data as ProjectArea[]) || []);
-
-    if (activitiesRes.ok) {
-      const json = (await activitiesRes.json()) as { data?: DailyActivityAreaRow[] };
-      setActivityEntries(json.data || []);
-    } else {
-      setActivityEntries([]);
-    }
+    setActivityEntries(activityRows as DailyActivityAreaRow[]);
     setLoadingActivities(false);
   }, [selectedProject?.id]);
 

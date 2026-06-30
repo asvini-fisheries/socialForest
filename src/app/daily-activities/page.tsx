@@ -10,6 +10,7 @@ import { DailyActivityFormDialog } from '@/components/daily-activities/daily-act
 import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { entryAmount, entryQuantity } from '@/lib/daily-activity-metrics';
+import { fetchDailyActivities } from '@/lib/daily-activities-client';
 import { formatAreaRef } from '@/lib/master-display';
 import type { DailyActivityUpdate } from '@/types/database';
 import { Plus, Activity, IndianRupee, Hash, Loader2, Pencil, Trash2, ListOrdered } from 'lucide-react';
@@ -74,10 +75,8 @@ export default function DailyActivitiesPage() {
     setError('');
 
     try {
-      const res = await fetch(`/api/daily-activities?project_id=${selectedProject.id}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to load entries');
-      setEntries(json.data || []);
+      const data = await fetchDailyActivities(selectedProject.id);
+      setEntries(data as ActivityEntry[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load entries');
       setEntries([]);

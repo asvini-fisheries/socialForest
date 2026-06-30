@@ -1,5 +1,6 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import type { NextRequest } from 'next/server';
 
 export function getServiceClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -23,11 +24,23 @@ export function getServiceClient() {
   );
 }
 
-export async function requireProjectAccess(projectId: string) {
+export async function requireProjectAccess(projectId: string, request?: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+
+  const bearer = request?.headers.get('authorization');
+  if (bearer?.startsWith('Bearer ')) {
+    const { data, error } = await supabase.auth.getUser(bearer.slice(7));
+    if (!error && data.user) user = data.user;
+  }
+
+  if (!user) {
+    const {
+      data: { user: cookieUser },
+    } = await supabase.auth.getUser();
+    user = cookieUser;
+  }
+
   if (!user) return { error: 'Unauthorized', status: 401 as const };
 
   const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
