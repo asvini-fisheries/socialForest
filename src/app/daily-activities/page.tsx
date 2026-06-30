@@ -4,12 +4,13 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DailyActivityFormDialog } from '@/components/daily-activities/daily-activity-form-dialog';
 import { useAuth } from '@/contexts/auth-context';
-import { formatDate, formatNumber } from '@/lib/utils';
+import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import type { DailyActivityUpdate } from '@/types/database';
-import { Plus, Activity, Camera, Package, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Activity, IndianRupee, Hash, Loader2, Pencil, Trash2, ListOrdered } from 'lucide-react';
 
 type ActivityEntry = DailyActivityUpdate & {
   project_activity?: {
@@ -28,11 +29,34 @@ type ActivityEntry = DailyActivityUpdate & {
   }[];
 };
 
-function activityAmount(entry: ActivityEntry): string {
-  if (entry.quantity_completed != null) {
-    return formatNumber(entry.quantity_completed);
-  }
-  return '—';
+type ActivityFilters = {
+  dateFrom: string;
+  dateTo: string;
+  projectArea: string;
+  activity: string;
+};
+
+const EMPTY_FILTERS: ActivityFilters = {
+  dateFrom: '',
+  dateTo: '',
+  projectArea: '',
+  activity: '',
+};
+
+function entryQuantity(entry: ActivityEntry): number {
+  return Number(entry.quantity_completed) || 0;
+}
+
+function entryAmount(entry: ActivityEntry): number {
+  return (entry.resources_used || []).reduce((sum, row) => {
+    const qty = Number(row.quantity_used) || 0;
+    const rate = Number(row.unit_rate) || 0;
+    return sum + qty * rate;
+  }, 0);
+}
+
+function hasActiveFilters(filters: ActivityFilters): boolean {
+  return Object.values(filters).some((v) => v.trim() !== '');
 }
 
 export default function DailyActivitiesPage() {
@@ -42,8 +66,7 @@ export default function DailyActivitiesPage() {
   const [error, setError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ActivityEntry | null>(null);
-
-  const today = new Date().toISOString().split('T')[0];
+  const [filters, setFilters] = useState<ActivityFilters>(EMPTY_FILTERS);
 
   const loadEntries = useCallback(async () => {
     if (!selectedProject) return;
@@ -66,13 +89,31 @@ export default function DailyActivitiesPage() {
     loadEntries();
   }, [loadEntries]);
 
-  const todayEntries = entries.filter((e) => e.activity_date === today);
-  const imageCount = entries.reduce((sum, e) => sum + (e.images?.length || 0), 0);
-  const resourceCount = entries.reduce((sum, e) => sum + (e.resources_used?.length || 0), 0);
+  const filteredEntries = useMemo(() => {
+    const areaQ = filters.projectArea.trim().toLowerCase();
+    const activityQ = filters.activity.trim().toLowerCase();
+
+    return entries.filter((entry) => {
+      if (filters.dateFrom && entry.activity_date < filters.dateFrom) return false;
+      if (filters.dateTo && entry.activity_date > filters.dateTo) return false;
+
+      if (areaQ) {
+        const areaName = entry.project_area?.name?.toLowerCase() || '';
+        if (!areaName.includes(areaQ)) return false;
+      }
+
+      if (activityQ) {
+        const activityName = entry.project_activity?.activity?.name?.toLowerCase() || '';
+        if (!activityName.includes(activityQ)) return false;
+      }
+
+      return true;
+    });
+  }, [entries, filters]);
 
   const sortedEntries = useMemo(
     () =>
-      [...entries].sort((a, b) => {
+      [...filteredEntries].sort((a, b) => {
         const dateCmp = b.activity_date.localeCompare(a.activity_date);
         if (dateCmp !== 0) return dateCmp;
         const areaA = a.project_area?.name || '';
@@ -83,8 +124,21 @@ export default function DailyActivitiesPage() {
         const actB = b.project_activity?.activity?.name || '';
         return actA.localeCompare(actB);
       }),
-    [entries]
+    [filteredEntries]
   );
+
+  const totals = useMemo(
+    () => ({
+      entries: filteredEntries.length,
+      quantity: filteredEntries.reduce((sum, e) => sum + entryQuantity(e), 0),
+      amount: filteredEntries.reduce((sum, e) => sum + entryAmount(e), 0),
+    }),
+    [filteredEntries]
+  );
+
+  function setFilter<K extends keyof ActivityFilters>(key: K, value: ActivityFilters[K]) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
 
   function openCreate() {
     setEditing(null);
@@ -119,6 +173,8 @@ export default function DailyActivitiesPage() {
     );
   }
 
+  const filtersActive = hasActiveFilters(filters);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -141,33 +197,38 @@ export default function DailyActivitiesPage() {
           <Card>
             <CardContent className="p-4 flex items-center gap-4">
               <div className="p-3 rounded-xl bg-emerald-50">
-                <Activity className="w-5 h-5 text-emerald-600" />
+                <ListOrdered className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Today&apos;s Entries</p>
-                <p className="text-2xl font-bold">{todayEntries.length}</p>
+                <p className="text-sm text-gray-500">Entries</p>
+                <p className="text-2xl font-bold">
+                  {formatNumber(totals.entries)}
+                  {filtersActive && entries.length !== totals.entries && (
+                    <span className="text-sm font-normal text-gray-400 ml-1">/ {formatNumber(entries.length)}</span>
+                  )}
+                </p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 flex items-center gap-4">
               <div className="p-3 rounded-xl bg-blue-50">
-                <Camera className="w-5 h-5 text-blue-600" />
+                <Hash className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Proof Images</p>
-                <p className="text-2xl font-bold">{imageCount}</p>
+                <p className="text-sm text-gray-500">Total Quantity</p>
+                <p className="text-2xl font-bold">{formatNumber(totals.quantity)}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 flex items-center gap-4">
               <div className="p-3 rounded-xl bg-amber-50">
-                <Package className="w-5 h-5 text-amber-600" />
+                <IndianRupee className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Resources Used</p>
-                <p className="text-2xl font-bold">{resourceCount}</p>
+                <p className="text-sm text-gray-500">Total Amount</p>
+                <p className="text-2xl font-bold">{formatCurrency(totals.amount)}</p>
               </div>
             </CardContent>
           </Card>
@@ -175,9 +236,42 @@ export default function DailyActivitiesPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Activity Entries</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Activity Entries
+              <span className="text-sm font-normal text-gray-400">
+                ({totals.entries}
+                {filtersActive ? ` of ${entries.length}` : ''})
+              </span>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <Input
+                label="Date from"
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => setFilter('dateFrom', e.target.value)}
+              />
+              <Input
+                label="Date to"
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => setFilter('dateTo', e.target.value)}
+              />
+              <Input
+                label="Project Area"
+                placeholder="Filter by area…"
+                value={filters.projectArea}
+                onChange={(e) => setFilter('projectArea', e.target.value)}
+              />
+              <Input
+                label="Activity"
+                placeholder="Filter by activity…"
+                value={filters.activity}
+                onChange={(e) => setFilter('activity', e.target.value)}
+              />
+            </div>
+
             {loading ? (
               <div className="flex items-center justify-center py-12 text-gray-400">
                 <Loader2 className="w-6 h-6 animate-spin mr-2" />
@@ -189,6 +283,12 @@ export default function DailyActivitiesPage() {
                 title="No daily activities recorded yet"
                 description="Click New Entry to record work progress with images and resource usage"
               />
+            ) : sortedEntries.length === 0 ? (
+              <EmptyState
+                icon={Activity}
+                title="No matching entries"
+                description="Try adjusting the filters above"
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -197,49 +297,71 @@ export default function DailyActivitiesPage() {
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Date</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Project Area</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Activity</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-500">Quantity</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500">Amount</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500 w-24">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedEntries.map((entry) => (
-                      <tr
-                        key={entry.id}
-                        className="border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <td className="py-3 px-4 text-gray-900 whitespace-nowrap">
-                          {formatDate(entry.activity_date)}
-                        </td>
-                        <td className="py-3 px-4 text-gray-700">
-                          {entry.project_area?.name || '—'}
-                        </td>
-                        <td className="py-3 px-4 text-gray-900">
-                          <p className="font-medium">{entry.project_activity?.activity?.name || '—'}</p>
-                          {entry.remarks && (
-                            <p className="text-xs text-gray-500 mt-0.5">{entry.remarks}</p>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right text-gray-900 tabular-nums">
-                          {activityAmount(entry)}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(entry)}>
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:bg-red-50"
-                              onClick={() => handleDelete(entry)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {sortedEntries.map((entry) => {
+                      const qty = entryQuantity(entry);
+                      const amt = entryAmount(entry);
+                      return (
+                        <tr
+                          key={entry.id}
+                          className="border-b border-gray-100 hover:bg-gray-50"
+                        >
+                          <td className="py-3 px-4 text-gray-900 whitespace-nowrap">
+                            {formatDate(entry.activity_date)}
+                          </td>
+                          <td className="py-3 px-4 text-gray-700">
+                            {entry.project_area?.name || '—'}
+                          </td>
+                          <td className="py-3 px-4 text-gray-900">
+                            <p className="font-medium">{entry.project_activity?.activity?.name || '—'}</p>
+                            {entry.remarks && (
+                              <p className="text-xs text-gray-500 mt-0.5">{entry.remarks}</p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right text-gray-900 tabular-nums">
+                            {qty ? formatNumber(qty) : '—'}
+                          </td>
+                          <td className="py-3 px-4 text-right text-gray-900 tabular-nums">
+                            {amt ? formatCurrency(amt) : '—'}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => openEdit(entry)}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:bg-red-50"
+                                onClick={() => handleDelete(entry)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+                      <td className="py-3 px-4 text-gray-900" colSpan={3}>
+                        Totals ({formatNumber(totals.entries)} entries)
+                      </td>
+                      <td className="py-3 px-4 text-right text-gray-900 tabular-nums">
+                        {formatNumber(totals.quantity)}
+                      </td>
+                      <td className="py-3 px-4 text-right text-gray-900 tabular-nums">
+                        {formatCurrency(totals.amount)}
+                      </td>
+                      <td className="py-3 px-4" />
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
