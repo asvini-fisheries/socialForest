@@ -65,14 +65,7 @@ export default function ProjectDetailPage() {
         .eq('is_active', true)
         .order('level')
         .order('name'),
-      supabase
-        .from('daily_activity_updates')
-        .select(
-          `project_area_id, quantity_completed,
-          project_activity:project_activities(activity:activities(name)),
-          resources_used:daily_activity_resources_used(quantity_used, unit_rate)`
-        )
-        .eq('project_id', id),
+      fetch(`/api/daily-activities?project_id=${encodeURIComponent(id)}`),
     ]);
 
     if (projectRes.error) {
@@ -81,9 +74,15 @@ export default function ProjectDetailPage() {
       return;
     }
 
+    let activityRows: DailyActivityAreaRow[] = [];
+    if (activitiesRes.ok) {
+      const activitiesJson = (await activitiesRes.json()) as { data?: DailyActivityAreaRow[] };
+      activityRows = activitiesJson.data || [];
+    }
+
     setProject(projectRes.data as Project);
     setAreas((areasRes.data as ProjectArea[]) || []);
-    setActivityEntries((activitiesRes.data as DailyActivityAreaRow[]) || []);
+    setActivityEntries(activityRows);
     setLoading(false);
   }, [id]);
 
