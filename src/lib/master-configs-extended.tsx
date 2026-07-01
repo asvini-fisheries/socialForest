@@ -14,7 +14,7 @@ import {
   ListOrdered,
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
-import { formatProjectCode } from '@/lib/master-display';
+import { formatProjectCode, formatOrgShortName } from '@/lib/master-display';
 import type { MasterConfig } from '@/lib/master-types';
 
 const PROJECT_ACTIVITY_OPTIONS = {
@@ -300,10 +300,7 @@ export const organisationContactsConfig: MasterConfig = {
     {
       key: 'org',
       header: 'Organisation',
-      render: (r) => {
-        const org = r.organisation as { name?: string } | null;
-        return org?.name || '—';
-      },
+      render: (r) => formatOrgShortName(r.organisation),
     },
     { key: 'name', header: 'Name', render: (r) => String(r.name) },
     { key: 'designation', header: 'Designation', render: (r) => String(r.designation || '—') },
@@ -345,10 +342,7 @@ export const organisationCertificatesConfig: MasterConfig = {
     {
       key: 'org',
       header: 'Organisation',
-      render: (r) => {
-        const org = r.organisation as { name?: string } | null;
-        return org?.name || '—';
-      },
+      render: (r) => formatOrgShortName(r.organisation),
     },
     {
       key: 'cert',
@@ -410,10 +404,7 @@ export const organisationEmployeesConfig: MasterConfig = {
     {
       key: 'org',
       header: 'Organisation',
-      render: (r) => {
-        const org = r.organisation as { name?: string } | null;
-        return org?.name || '—';
-      },
+      render: (r) => formatOrgShortName(r.organisation),
     },
     { key: 'code', header: 'Code', render: (r) => String(r.employee_code) },
     { key: 'name', header: 'Name', render: (r) => String(r.full_name) },

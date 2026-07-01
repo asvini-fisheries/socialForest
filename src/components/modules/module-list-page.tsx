@@ -42,6 +42,12 @@ export function ModuleListPage<T extends { id: string }>({
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!selectedProject) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
     async function load() {
       setLoading(true);
       setError('');
@@ -56,6 +62,18 @@ export function ModuleListPage<T extends { id: string }>({
     }
     load();
   }, [fetchData, selectedProject?.id]);
+
+  if (!selectedProject) {
+    return (
+      <DashboardLayout>
+        <EmptyState
+          icon={Icon}
+          title="No project selected"
+          description="Select a project from the header to view this screen"
+        />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

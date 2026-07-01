@@ -119,7 +119,13 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
           : '';
 
       if (isAdmin) {
-        const res = await masterApiFetch(`/api/masters/${config.table}/records${projectQuery}`);
+        const selectQuery = config.selectQuery || tableSpec?.selectQuery;
+        const selectParam = selectQuery
+          ? `${projectQuery ? '&' : '?'}select=${encodeURIComponent(selectQuery)}`
+          : '';
+        const res = await masterApiFetch(
+          `/api/masters/${config.table}/records${projectQuery}${selectParam}`
+        );
         if (!res.ok) throw new Error(await parseMasterApiError(res));
         const result = (await res.json()) as { data?: Record<string, unknown>[] };
         let data = result.data || [];
@@ -159,7 +165,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [config.table, config.orderBy, config.selectQuery, isAdmin, projectScope, selectedProject?.id]);
+  }, [config.table, config.orderBy, config.selectQuery, isAdmin, projectScope, selectedProject?.id, tableSpec?.selectQuery]);
 
   useEffect(() => {
     loadRows();

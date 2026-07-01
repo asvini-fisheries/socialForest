@@ -376,6 +376,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Stakeholder Resources',
     table: 'stakeholder_resources',
     orderBy: 'created_at',
+    selectQuery: '*, stakeholder:stakeholders(name, code), resource:resources_materials(name, code)',
     importEnabled: true,
     searchKeys: ['stakeholder', 'resource'],
     importColumns: [
@@ -400,6 +401,8 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Stakeholder Supply Rates',
     table: 'stakeholder_supply_rates',
     orderBy: 'effective_from',
+    selectQuery:
+      '*, stakeholder:stakeholders(name, code), resource:resources_materials(name, code), project:projects(name, code)',
     importEnabled: true,
     searchKeys: ['stakeholder', 'resource', 'project'],
     importColumns: [
@@ -433,6 +436,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Stakeholder Access Rights',
     table: 'stakeholder_category_access_rights',
     orderBy: 'module_name',
+    selectQuery: '*, category:stakeholder_categories(name)',
     importEnabled: true,
     searchKeys: ['module_name'],
     importColumns: [
@@ -455,6 +459,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Organisation Contacts',
     table: 'organisation_contacts',
     orderBy: 'name',
+    selectQuery: '*, organisation:organisations(name, code)',
     importEnabled: true,
     searchKeys: ['name', 'email', 'mobile'],
     importColumns: [
@@ -477,6 +482,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Organisation Certificates',
     table: 'organisation_certificates',
     orderBy: 'expiry_date',
+    selectQuery: '*, organisation:organisations(name, code), certificate:certificates(name)',
     importEnabled: true,
     searchKeys: ['certificate_number'],
     importColumns: [
@@ -503,6 +509,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Organisation Employees',
     table: 'organisation_employees',
     orderBy: 'full_name',
+    selectQuery: '*, organisation:organisations(name, code), designation:designations(name)',
     importEnabled: true,
     searchKeys: ['full_name', 'employee_code', 'mobile', 'email'],
     importColumns: [
@@ -534,6 +541,8 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Activity Resource Requirements',
     table: 'activity_resource_requirements',
     orderBy: 'created_at',
+    selectQuery:
+      '*, project_activity:project_activities(project_id, project:projects(name), activity:activities(name), project_area:project_areas(name)), resource:resources_materials(name, code)',
     importEnabled: true,
     searchKeys: ['project_activity', 'resource'],
     compositeLookups: [
@@ -578,6 +587,8 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Activity Contractor Allocations',
     table: 'activity_contractor_allocations',
     orderBy: 'start_date',
+    selectQuery:
+      '*, project_activity:project_activities(project_id, project:projects(name), activity:activities(name), project_area:project_areas(name)), stakeholder:stakeholders(name, code)',
     importEnabled: true,
     searchKeys: ['project_activity', 'stakeholder'],
     compositeLookups: [
@@ -625,6 +636,7 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Work Contracts',
     table: 'work_contracts',
     orderBy: 'contract_date',
+    selectQuery: '*, project:projects(name, code), stakeholder:stakeholders(name, code)',
     importEnabled: true,
     searchKeys: ['contract_number', 'project', 'stakeholder'],
     importColumns: [
@@ -666,6 +678,8 @@ export const MASTER_TABLE_SPECS: Record<string, MasterTableSpec> = {
     title: 'Work Contract Items',
     table: 'work_contract_items',
     orderBy: 'created_at',
+    selectQuery:
+      '*, contract:work_contracts(contract_number, project:projects(name)), resource:resources_materials(name, code), activity:activities(name, code)',
     importEnabled: true,
     searchKeys: ['description', 'contract'],
     importColumns: [

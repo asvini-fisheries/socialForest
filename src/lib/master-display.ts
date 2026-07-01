@@ -1,3 +1,10 @@
+/** Organisation short name — code preferred, then name */
+export function formatOrgShortName(ref: unknown): string {
+  const row = ref as { name?: string; code?: string } | null | undefined;
+  if (!row) return '—';
+  return row.code || row.name || '—';
+}
+
 /** Format joined project/parent area reference for display and filtering */
 export function formatAreaRef(ref: unknown): string {
   const row = ref as { name?: string; code?: string } | null | undefined;

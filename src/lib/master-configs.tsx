@@ -18,7 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import { ROLE_LABELS } from '@/types/database';
 import { formatProjectStatus } from '@/lib/projects';
-import { formatAreaRef, formatProjectCode, projectAreaParentText, projectAreaProjectText, projectActivityActivityKey, projectActivityActivityText, projectActivityAreaKey, projectActivityAreaText, projectActivityProjectText, resourceCategoryKey, resourceCategoryText, resourceTreeSpeciesKey, resourceTreeSpeciesText } from '@/lib/master-display';
+import { formatAreaRef, formatOrgShortName, formatProjectCode, projectAreaParentText, projectAreaProjectText, projectActivityActivityKey, projectActivityActivityText, projectActivityAreaKey, projectActivityAreaText, projectActivityProjectText, resourceCategoryKey, resourceCategoryText, resourceTreeSpeciesKey, resourceTreeSpeciesText } from '@/lib/master-display';
 import type { MasterConfig } from '@/lib/master-types';
 
 const USER_ROLES = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -384,10 +384,7 @@ export const projectsConfig: MasterConfig = {
     {
       key: 'org',
       header: 'Organisation',
-      render: (r) => {
-        const org = r.organisation as { name?: string } | null;
-        return org?.name || '—';
-      },
+      render: (r) => formatOrgShortName(r.organisation),
     },
     { key: 'status', header: 'Status', render: (r) => formatProjectStatus(String(r.status)) },
     { key: 'active', header: 'Active', render: (r) => (r.is_active ? 'Yes' : 'No') },

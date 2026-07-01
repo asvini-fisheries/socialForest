@@ -25,7 +25,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   const service = getMasterServiceClient();
-  const select = spec.selectQuery || '*';
+  const selectParam = request.nextUrl.searchParams.get('select');
+  const select = selectParam || spec.selectQuery || '*';
   const projectId = request.nextUrl.searchParams.get('project_id');
   const filterColumn = apiProjectFilterColumn(table);
 

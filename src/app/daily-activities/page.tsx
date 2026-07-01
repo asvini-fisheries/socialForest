@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ExcelExportButton } from '@/components/export/excel-export-button';
 import { DailyActivityFormDialog } from '@/components/daily-activities/daily-activity-form-dialog';
 import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
@@ -13,7 +14,7 @@ import { entryAmount, entryQuantity } from '@/lib/daily-activity-metrics';
 import { fetchDailyActivities } from '@/lib/daily-activities-client';
 import { formatAreaRef } from '@/lib/master-display';
 import type { DailyActivityUpdate } from '@/types/database';
-import { Plus, Activity, IndianRupee, Hash, Loader2, Pencil, Trash2, ListOrdered } from 'lucide-react';
+import { Plus, Activity, Loader2, Pencil, Trash2 } from 'lucide-react';
 
 type ActivityEntry = DailyActivityUpdate & {
   project_activity?: {
@@ -42,6 +43,7 @@ type ActivityFilters = {
   parentArea: string;
   projectArea: string;
   activity: string;
+  stakeholder: string;
 };
 
 const EMPTY_FILTERS: ActivityFilters = {
@@ -50,7 +52,19 @@ const EMPTY_FILTERS: ActivityFilters = {
   parentArea: '',
   projectArea: '',
   activity: '',
+  stakeholder: '',
 };
+
+const EXPORT_COLUMNS = [
+  { key: 'activity_date', header: 'Date' },
+  { key: 'parent_area', header: 'Parent Area' },
+  { key: 'project_area', header: 'Project Area' },
+  { key: 'activity', header: 'Activity' },
+  { key: 'stakeholder', header: 'Stakeholder' },
+  { key: 'quantity', header: 'Quantity' },
+  { key: 'amount', header: 'Amount' },
+  { key: 'remarks', header: 'Remarks' },
+];
 
 function entryParentAreaText(entry: ActivityEntry): string {
   return formatAreaRef(entry.project_area?.parent_area) || '';
@@ -58,6 +72,19 @@ function entryParentAreaText(entry: ActivityEntry): string {
 
 function hasActiveFilters(filters: ActivityFilters): boolean {
   return Object.values(filters).some((v) => v.trim() !== '');
+}
+
+function toExportRow(entry: ActivityEntry): Record<string, unknown> {
+  return {
+    activity_date: formatDate(entry.activity_date),
+    parent_area: entryParentAreaText(entry),
+    project_area: entry.project_area?.name || '',
+    activity: entry.project_activity?.activity?.name || '',
+    stakeholder: entry.stakeholder?.name || '',
+    quantity: entryQuantity(entry) || '',
+    amount: entryAmount(entry) || '',
+    remarks: entry.remarks || '',
+  };
 }
 
 export default function DailyActivitiesPage() {
@@ -92,6 +119,7 @@ export default function DailyActivitiesPage() {
     const parentQ = filters.parentArea.trim().toLowerCase();
     const areaQ = filters.projectArea.trim().toLowerCase();
     const activityQ = filters.activity.trim().toLowerCase();
+    const stakeholderQ = filters.stakeholder.trim().toLowerCase();
 
     return entries.filter((entry) => {
       if (filters.dateFrom && entry.activity_date < filters.dateFrom) return false;
@@ -111,6 +139,11 @@ export default function DailyActivitiesPage() {
       if (activityQ) {
         const activityName = entry.project_activity?.activity?.name?.toLowerCase() || '';
         if (!activityName.includes(activityQ)) return false;
+      }
+
+      if (stakeholderQ) {
+        const stakeholderName = entry.stakeholder?.name?.toLowerCase() || '';
+        if (!stakeholderName.includes(stakeholderQ)) return false;
       }
 
       return true;
@@ -142,6 +175,11 @@ export default function DailyActivitiesPage() {
       amount: filteredEntries.reduce((sum, e) => sum + entryAmount(e), 0),
     }),
     [filteredEntries]
+  );
+
+  const exportRows = useMemo(
+    () => sortedEntries.map(toExportRow),
+    [sortedEntries]
   );
 
   function setFilter<K extends keyof ActivityFilters>(key: K, value: ActivityFilters[K]) {
@@ -186,61 +224,29 @@ export default function DailyActivitiesPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Daily Activities</h1>
             <p className="text-gray-500 mt-1">Record work progress with proof images</p>
           </div>
-          <Button onClick={openCreate}>
-            <Plus className="w-4 h-4" />
-            New Entry
-          </Button>
+          <div className="flex items-center gap-2">
+            <ExcelExportButton
+              sheetName="Daily Activities"
+              filename="daily_activities.xlsx"
+              columns={EXPORT_COLUMNS}
+              rows={exportRows}
+              disabled={loading || sortedEntries.length === 0}
+            />
+            <Button onClick={openCreate}>
+              <Plus className="w-4 h-4" />
+              New Entry
+            </Button>
+          </div>
         </div>
 
         {error && (
           <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>
         )}
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-emerald-50">
-                <ListOrdered className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Entries</p>
-                <p className="text-2xl font-bold">
-                  {formatNumber(totals.entries)}
-                  {filtersActive && entries.length !== totals.entries && (
-                    <span className="text-sm font-normal text-gray-400 ml-1">/ {formatNumber(entries.length)}</span>
-                  )}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-blue-50">
-                <Hash className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Total Quantity</p>
-                <p className="text-2xl font-bold">{formatNumber(totals.quantity)}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-amber-50">
-                <IndianRupee className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Total Amount</p>
-                <p className="text-2xl font-bold">{formatCurrency(totals.amount)}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         <Card>
           <CardHeader>
@@ -253,7 +259,7 @@ export default function DailyActivitiesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
               <Input
                 label="Date from"
                 type="date"
@@ -284,6 +290,12 @@ export default function DailyActivitiesPage() {
                 value={filters.activity}
                 onChange={(e) => setFilter('activity', e.target.value)}
               />
+              <Input
+                label="Stakeholder"
+                placeholder="Filter by stakeholder…"
+                value={filters.stakeholder}
+                onChange={(e) => setFilter('stakeholder', e.target.value)}
+              />
             </div>
 
             {loading ? (
@@ -312,6 +324,7 @@ export default function DailyActivitiesPage() {
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Parent Area</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Project Area</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Activity</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500">Stakeholder</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500">Quantity</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500">Amount</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500 w-24">Actions</th>
@@ -341,6 +354,9 @@ export default function DailyActivitiesPage() {
                               <p className="text-xs text-gray-500 mt-0.5">{entry.remarks}</p>
                             )}
                           </td>
+                          <td className="py-3 px-4 text-gray-700">
+                            {entry.stakeholder?.name || '—'}
+                          </td>
                           <td className="py-3 px-4 text-right text-gray-900 tabular-nums">
                             {qty ? formatNumber(qty) : '—'}
                           </td>
@@ -368,7 +384,7 @@ export default function DailyActivitiesPage() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                      <td className="py-3 px-4 text-gray-900" colSpan={4}>
+                      <td className="py-3 px-4 text-gray-900" colSpan={5}>
                         Totals ({formatNumber(totals.entries)} entries)
                       </td>
                       <td className="py-3 px-4 text-right text-gray-900 tabular-nums">

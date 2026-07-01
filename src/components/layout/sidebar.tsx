@@ -57,6 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Projects', href: '/projects', icon: FolderKanban, module: 'projects' },
   { label: 'Daily Activities', href: '/daily-activities', icon: Activity, module: 'daily_activities' },
   { label: 'Attendance', href: '/attendance', icon: ClipboardList, module: 'attendance' },
+  { label: 'Attendance Details', href: '/attendance/details', icon: ClipboardList, module: 'attendance' },
   { label: 'Bills', href: '/bills', icon: Receipt, module: 'bills' },
   { label: 'Invoices', href: '/invoices', icon: FileText, module: 'invoices' },
   { label: 'Payments', href: '/payments', icon: CreditCard, module: 'payments' },

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,6 +131,12 @@ export default function AttendancePage() {
             <p className="text-gray-500 mt-1">Mark organisation employee attendance</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/attendance/details"
+              className="inline-flex items-center justify-center h-10 px-4 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              View Details
+            </Link>
             <input
               type="date"
               value={date}
