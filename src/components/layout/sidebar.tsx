@@ -59,6 +59,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Attendance', href: '/attendance', icon: ClipboardList, module: 'attendance' },
   { label: 'Attendance Details', href: '/attendance/details', icon: ClipboardList, module: 'attendance' },
   { label: 'Bills', href: '/bills', icon: Receipt, module: 'bills' },
+  { label: 'Unbilled Activities', href: '/bills/unbilled', icon: ClipboardList, module: 'bills' },
   { label: 'Invoices', href: '/invoices', icon: FileText, module: 'invoices' },
   { label: 'Payments', href: '/payments', icon: CreditCard, module: 'payments' },
   { label: 'Expenses', href: '/expenses', icon: Receipt, module: 'expenses' },

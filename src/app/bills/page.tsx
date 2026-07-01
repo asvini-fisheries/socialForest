@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -138,9 +139,14 @@ export default function BillsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stakeholder Bills</h1>
-          <p className="text-gray-500 mt-1">Generate bills from daily activity entries for a custom date range</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Stakeholder Bills</h1>
+            <p className="text-gray-500 mt-1">Generate bills from daily activity entries for a custom date range</p>
+          </div>
+          <Button variant="outline" asChild>
+            <Link href="/bills/unbilled">View Unbilled Activities</Link>
+          </Button>
         </div>
 
         {error && (
@@ -260,6 +266,7 @@ export default function BillsPage() {
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Period</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500">Amount</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Status</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-500">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -280,6 +287,14 @@ export default function BillsPage() {
                         </td>
                         <td className="py-3 px-4">
                           <StatusBadge status={row.status} />
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <Link
+                            href={`/bills/${row.id}`}
+                            className="text-emerald-600 hover:text-emerald-700 font-medium"
+                          >
+                            View
+                          </Link>
                         </td>
                       </tr>
                     ))}

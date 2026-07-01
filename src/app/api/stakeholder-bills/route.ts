@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  ACTIVITY_SELECT,
   BILL_LIST_SELECT,
   getServiceClient,
   requireProjectAccess,
@@ -12,53 +11,13 @@ import {
   activityBillUnitRate,
   formatBillNumber,
   groupActivitiesByStakeholder,
-  type BillableActivity,
 } from '@/lib/stakeholder-bills-utils';
+import {
+  fetchUnbilledActivities,
+  toUnbilledActivityRows,
+} from '@/lib/stakeholder-bills-unbilled';
 
-async function fetchUnbilledActivities(
-  projectId: string,
-  periodFrom: string,
-  periodTo: string,
-  stakeholderIds?: string[]
-) {
-  const service = getServiceClient();
-
-  const { data: activities, error } = await service
-    .from('daily_activity_updates')
-    .select(ACTIVITY_SELECT)
-    .eq('project_id', projectId)
-    .gte('activity_date', periodFrom)
-    .lte('activity_date', periodTo)
-    .order('activity_date', { ascending: true });
-
-  if (error) throw new Error(error.message);
-
-  const activityRows = (activities || []) as BillableActivity[];
-  if (!activityRows.length) return [];
-
-  const activityIds = activityRows.map((a) => a.id);
-  const { data: billedItems, error: billedError } = await service
-    .from('stakeholder_bill_items')
-    .select('daily_activity_id')
-    .in('daily_activity_id', activityIds);
-
-  if (billedError) throw new Error(billedError.message);
-
-  const billedIds = new Set(
-    (billedItems || []).map((row) => row.daily_activity_id).filter(Boolean) as string[]
-  );
-
-  let unbilled = activityRows.filter((row) => !billedIds.has(row.id));
-
-  if (stakeholderIds?.length) {
-    const allowed = new Set(stakeholderIds);
-    unbilled = unbilled.filter((row) => allowed.has(row.stakeholder_id));
-  }
-
-  return unbilled;
-}
-
-function buildPreview(periodFrom: string, periodTo: string, activities: BillableActivity[]) {
+function buildPreview(periodFrom: string, periodTo: string, activities: Awaited<ReturnType<typeof fetchUnbilledActivities>>) {
   const groups = groupActivitiesByStakeholder(activities);
   const stakeholders = Array.from(groups.entries()).map(([stakeholderId, rows]) => ({
     stakeholder_id: stakeholderId,
@@ -81,6 +40,7 @@ export async function GET(request: NextRequest) {
   const periodFrom = request.nextUrl.searchParams.get('period_from');
   const periodTo = request.nextUrl.searchParams.get('period_to');
   const preview = request.nextUrl.searchParams.get('preview') === '1';
+  const unbilledView = request.nextUrl.searchParams.get('view') === 'unbilled';
   const stakeholderIdsParam = request.nextUrl.searchParams.get('stakeholder_ids');
   const stakeholderIds = stakeholderIdsParam
     ? stakeholderIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
@@ -96,6 +56,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (unbilledView) {
+      const activities = await fetchUnbilledActivities(
+        projectId,
+        periodFrom || undefined,
+        periodTo || undefined,
+        stakeholderIds
+      );
+      return NextResponse.json({ data: toUnbilledActivityRows(activities) });
+    }
+
     if (preview) {
       if (!periodFrom || !periodTo) {
         return NextResponse.json({ error: 'period_from and period_to required for preview' }, { status: 400 });
@@ -104,7 +74,12 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'period_from must be on or before period_to' }, { status: 400 });
       }
 
-      const activities = await fetchUnbilledActivities(projectId, periodFrom, periodTo, stakeholderIds);
+      const activities = await fetchUnbilledActivities(
+        projectId,
+        periodFrom,
+        periodTo,
+        stakeholderIds
+      );
       return NextResponse.json({ data: buildPreview(periodFrom, periodTo, activities) });
     }
 
