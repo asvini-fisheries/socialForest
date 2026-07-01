@@ -1,56 +1,133 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ExcelExportButton } from '@/components/export/excel-export-button';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchOutwardBills } from '@/lib/nursery-client';
+import { fetchOutwardDetailLines } from '@/lib/nursery-client';
+import type { OutwardDetailLine } from '@/lib/nursery-lines';
 import { formatDate, formatNumber } from '@/lib/utils';
-import { ArrowLeft, ArrowUpFromLine, Loader2, Plus, Search } from 'lucide-react';
+import { ArrowLeft, ArrowUpFromLine, Loader2, Plus } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<string, string> = {
   plantation: 'Plantation',
   replacement: 'Replacement',
 };
 
-type OutwardRow = {
-  id: string;
-  issue_date: string;
-  issue_category: string;
-  log_number: string | null;
-  total_saplings?: number;
-  project_area?: { name?: string; code?: string } | null;
+type OutwardFilters = {
+  dateFrom: string;
+  dateTo: string;
+  projectArea: string;
+  resourceId: string;
 };
+
+const EMPTY_FILTERS: OutwardFilters = {
+  dateFrom: '',
+  dateTo: '',
+  projectArea: '',
+  resourceId: '',
+};
+
+const EXPORT_COLUMNS = [
+  { key: 'issue_date', header: 'Date' },
+  { key: 'log_number', header: 'Log No' },
+  { key: 'project_area', header: 'Project Area' },
+  { key: 'issue_category', header: 'Category' },
+  { key: 'species_name', header: 'Tree Species' },
+  { key: 'quantity', header: 'Qty' },
+];
+
+function projectAreaLabel(row: OutwardDetailLine): string {
+  return row.project_area_code
+    ? `${row.project_area_name} (${row.project_area_code})`
+    : row.project_area_name;
+}
+
+function speciesLabel(row: OutwardDetailLine): string {
+  return row.species_code ? `${row.species_name} (${row.species_code})` : row.species_name;
+}
+
+function toExportRow(row: OutwardDetailLine): Record<string, unknown> {
+  return {
+    issue_date: formatDate(row.issue_date),
+    log_number: row.log_number,
+    project_area: projectAreaLabel(row),
+    issue_category: CATEGORY_LABELS[row.issue_category] || row.issue_category,
+    species_name: speciesLabel(row),
+    quantity: row.quantity,
+  };
+}
 
 export default function NurseryOutwardsPage() {
   const { selectedProject } = useAuth();
-  const [rows, setRows] = useState<OutwardRow[]>([]);
-  const [search, setSearch] = useState('');
+  const [rows, setRows] = useState<OutwardDetailLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filters, setFilters] = useState<OutwardFilters>(EMPTY_FILTERS);
 
   const loadRows = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
     setError('');
     try {
-      const data = await fetchOutwardBills(selectedProject.id, search);
+      const data = await fetchOutwardDetailLines(selectedProject.id);
       setRows(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load outward logs');
+      setError(err instanceof Error ? err.message : 'Failed to load outward details');
       setRows([]);
     }
     setLoading(false);
-  }, [selectedProject, search]);
+  }, [selectedProject]);
 
   useEffect(() => {
-    const timer = setTimeout(() => loadRows(), search ? 250 : 0);
-    return () => clearTimeout(timer);
-  }, [loadRows, search]);
+    loadRows();
+  }, [loadRows]);
+
+  const projectAreaOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.project_area_id) {
+        map.set(row.project_area_id, projectAreaLabel(row));
+      }
+    }
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [rows]);
+
+  const speciesOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.resource_id) {
+        map.set(row.resource_id, speciesLabel(row));
+      }
+    }
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (filters.dateFrom && row.issue_date < filters.dateFrom) return false;
+      if (filters.dateTo && row.issue_date > filters.dateTo) return false;
+      if (filters.projectArea && row.project_area_id !== filters.projectArea) return false;
+      if (filters.resourceId && row.resource_id !== filters.resourceId) return false;
+      return true;
+    });
+  }, [rows, filters]);
+
+  const exportRows = useMemo(() => filteredRows.map(toExportRow), [filteredRows]);
+
+  function setFilter<K extends keyof OutwardFilters>(key: K, value: OutwardFilters[K]) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
 
   if (!selectedProject) {
     return (
@@ -69,15 +146,24 @@ export default function NurseryOutwardsPage() {
               <ArrowLeft className="w-4 h-4" />
               Back to Nursery
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">Nursery Outward Logs</h1>
-            <p className="text-gray-500 mt-1">Saplings issued by project area and log number</p>
+            <h1 className="text-2xl font-bold text-gray-900">Outward Details</h1>
+            <p className="text-gray-500 mt-1">Line-wise sapling issue entries</p>
           </div>
-          <Button asChild>
-            <Link href="/nursery/outwards/new">
-              <Plus className="w-4 h-4" />
-              New Outward Log
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <ExcelExportButton
+              sheetName="Outward Details"
+              filename="nursery_outward_details.xlsx"
+              columns={EXPORT_COLUMNS}
+              rows={exportRows}
+              disabled={loading || filteredRows.length === 0}
+            />
+            <Button asChild>
+              <Link href="/nursery/outwards/new">
+                <Plus className="w-4 h-4" />
+                New Outward Log
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -86,16 +172,35 @@ export default function NurseryOutwardsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Outward Logs ({rows.length})</CardTitle>
+            <CardTitle>Outward Lines ({filteredRows.length})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <Input
-                className="pl-9"
-                placeholder="Search log number, area, category…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                label="Date from"
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => setFilter('dateFrom', e.target.value)}
+              />
+              <Input
+                label="Date to"
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => setFilter('dateTo', e.target.value)}
+              />
+              <Select
+                label="Project area"
+                value={filters.projectArea}
+                onChange={(e) => setFilter('projectArea', e.target.value)}
+                placeholder="All project areas"
+                options={[{ value: '', label: 'All project areas' }, ...projectAreaOptions]}
+              />
+              <Select
+                label="Tree species"
+                value={filters.resourceId}
+                onChange={(e) => setFilter('resourceId', e.target.value)}
+                placeholder="All species"
+                options={[{ value: '', label: 'All species' }, ...speciesOptions]}
               />
             </div>
 
@@ -104,44 +209,35 @@ export default function NurseryOutwardsPage() {
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 Loading...
               </div>
-            ) : rows.length === 0 ? (
-              <EmptyState icon={ArrowUpFromLine} title="No outward logs yet" />
+            ) : filteredRows.length === 0 ? (
+              <EmptyState icon={ArrowUpFromLine} title="No outward lines found" />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Date</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-500">Log #</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500">Log No</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Project Area</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-500">Category</th>
-                      <th className="text-right py-3 px-4 font-medium text-gray-500">Saplings</th>
-                      <th className="text-right py-3 px-4 font-medium text-gray-500">Actions</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500">Tree Species</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-500">Qty</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    {filteredRows.map((row) => (
+                      <tr key={row.line_id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4">{formatDate(row.issue_date)}</td>
-                        <td className="py-3 px-4 font-medium">{row.log_number || '—'}</td>
-                        <td className="py-3 px-4">
-                          {row.project_area?.name || '—'}
-                          {row.project_area?.code && (
-                            <span className="text-gray-400 ml-1">({row.project_area.code})</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">{CATEGORY_LABELS[row.issue_category] || row.issue_category}</td>
-                        <td className="py-3 px-4 text-right tabular-nums">
-                          {formatNumber(row.total_saplings || 0)}
-                        </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-3 px-4 font-medium">
                           <Link
-                            href={`/nursery/outwards/${row.id}`}
-                            className="text-emerald-600 hover:text-emerald-700 font-medium"
+                            href={`/nursery/outwards/${row.bill_id}`}
+                            className="text-emerald-600 hover:text-emerald-700"
                           >
-                            View
+                            {row.log_number || '—'}
                           </Link>
                         </td>
+                        <td className="py-3 px-4">{projectAreaLabel(row) || '—'}</td>
+                        <td className="py-3 px-4">{speciesLabel(row) || '—'}</td>
+                        <td className="py-3 px-4 text-right tabular-nums">{formatNumber(row.quantity)}</td>
                       </tr>
                     ))}
                   </tbody>

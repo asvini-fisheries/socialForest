@@ -63,6 +63,18 @@ export async function fetchInwardBills(projectId: string, search = '') {
   return json.data || [];
 }
 
+export async function fetchInwardDetailLines(projectId: string, search = '') {
+  const params = new URLSearchParams({ project_id: projectId, view: 'lines' });
+  if (search.trim()) params.set('search', search.trim());
+  const res = await fetch(`/api/nursery/inwards?${params}`, {
+    headers: await authHeaders(),
+    credentials: 'include',
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to load inward details');
+  return json.data || [];
+}
+
 export async function fetchInwardBill(projectId: string, id: string) {
   const res = await fetch(`/api/nursery/inwards/${id}?project_id=${projectId}`, {
     headers: await authHeaders(),
@@ -102,6 +114,18 @@ export async function fetchOutwardBills(projectId: string, search = '') {
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Failed to load outward entries');
+  return json.data || [];
+}
+
+export async function fetchOutwardDetailLines(projectId: string, search = '') {
+  const params = new URLSearchParams({ project_id: projectId, view: 'lines' });
+  if (search.trim()) params.set('search', search.trim());
+  const res = await fetch(`/api/nursery/outwards?${params}`, {
+    headers: await authHeaders(),
+    credentials: 'include',
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to load outward details');
   return json.data || [];
 }
 

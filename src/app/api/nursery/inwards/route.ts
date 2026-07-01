@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   INWARD_BILL_SELECT,
   INWARD_LIST_SELECT,
+  INWARD_LINES_BILL_SELECT,
   getServiceClient,
   requireProjectAccess,
 } from '@/lib/nursery-api';
@@ -10,10 +11,12 @@ import {
   computeTotalAmount,
   normalizeLines,
 } from '@/lib/nursery-utils';
+import { flattenInwardBillsToLines } from '@/lib/nursery-lines';
 
 export async function GET(request: NextRequest) {
   const projectId = request.nextUrl.searchParams.get('project_id');
   const search = (request.nextUrl.searchParams.get('search') || '').trim().toLowerCase();
+  const view = request.nextUrl.searchParams.get('view');
 
   if (!projectId) {
     return NextResponse.json({ error: 'project_id required' }, { status: 400 });
@@ -26,6 +29,36 @@ export async function GET(request: NextRequest) {
 
   try {
     const service = getServiceClient();
+
+    if (view === 'lines') {
+      const { data, error } = await service
+        .from('nursery_inward_bills')
+        .select(INWARD_LINES_BILL_SELECT)
+        .eq('project_id', projectId)
+        .order('bill_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+      let lines = flattenInwardBillsToLines((data || []) as Parameters<typeof flattenInwardBillsToLines>[0]);
+      if (search) {
+        lines = lines.filter((row) => {
+          const haystack = [
+            row.invoice_number,
+            row.stakeholder_name,
+            row.stakeholder_code,
+            row.species_name,
+            row.species_code,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(search);
+        });
+      }
+      return NextResponse.json({ data: lines });
+    }
+
     const { data, error } = await service
       .from('nursery_inward_bills')
       .select(INWARD_LIST_SELECT)

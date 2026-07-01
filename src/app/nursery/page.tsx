@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ExcelExportButton } from '@/components/export/excel-export-button';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchNurseryStock } from '@/lib/nursery-client';
 import { formatNumber } from '@/lib/utils';
@@ -21,6 +22,24 @@ type StockRow = {
   total_issued: number;
   current_stock: number;
 };
+
+const STOCK_EXPORT_COLUMNS = [
+  { key: 'species', header: 'Species' },
+  { key: 'species_code', header: 'Species Code' },
+  { key: 'total_inward', header: 'Total Inward' },
+  { key: 'total_issued', header: 'Total Issued' },
+  { key: 'current_stock', header: 'Current Stock' },
+];
+
+function toStockExportRow(row: StockRow): Record<string, unknown> {
+  return {
+    species: row.resource_name,
+    species_code: row.resource_code || '',
+    total_inward: row.total_inward,
+    total_issued: row.total_issued,
+    current_stock: row.current_stock,
+  };
+}
 
 export default function NurseryPage() {
   const { selectedProject } = useAuth();
@@ -48,6 +67,13 @@ export default function NurseryPage() {
     return () => clearTimeout(timer);
   }, [loadStock, search]);
 
+  const filteredStock = useMemo(
+    () => stock.filter((row) => row.current_stock > 0 || row.total_inward > 0 || !search),
+    [stock, search]
+  );
+
+  const exportRows = useMemo(() => filteredStock.map(toStockExportRow), [filteredStock]);
+
   if (!selectedProject) {
     return (
       <DashboardLayout>
@@ -60,8 +86,6 @@ export default function NurseryPage() {
     );
   }
 
-  const filteredStock = stock.filter((row) => row.current_stock > 0 || row.total_inward > 0 || !search);
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -70,17 +94,29 @@ export default function NurseryPage() {
             <h1 className="text-2xl font-bold text-gray-900">Centralized Nursery</h1>
             <p className="text-gray-500 mt-1">Stock, inward purchase bills, and outward issues</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/nursery/inwards">
+                <Eye className="w-3.5 h-3.5" />
+                View Inward Details
+              </Link>
+            </Button>
             <Button variant="outline" asChild>
               <Link href="/nursery/inwards/new">
                 <ArrowDownToLine className="w-4 h-4" />
                 New Inward Bill
               </Link>
             </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/nursery/outwards">
+                <Eye className="w-3.5 h-3.5" />
+                View Outward Details
+              </Link>
+            </Button>
             <Button asChild>
               <Link href="/nursery/outwards/new">
                 <ArrowUpFromLine className="w-4 h-4" />
-                New Outward
+                New Outward Log
               </Link>
             </Button>
           </div>
@@ -90,47 +126,20 @@ export default function NurseryPage() {
           <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Inward Bills</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-gray-500">
-                Purchase bills from stakeholders with invoice, date, image, and species lines with rates.
-              </p>
-              <Button variant="outline" asChild className="w-full">
-                <Link href="/nursery/inwards">
-                  <Eye className="w-4 h-4" />
-                  View Inward Details
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Outward Issues</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-gray-500">
-                Issue logs with project area, log number, and sapling species with quantities.
-              </p>
-              <Button variant="outline" asChild className="w-full">
-                <Link href="/nursery/outwards">
-                  <Eye className="w-4 h-4" />
-                  View Outward Details
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
             <CardTitle className="flex items-center gap-2">
               <Sprout className="w-5 h-5 text-emerald-600" />
               Current Stock
             </CardTitle>
+            <ExcelExportButton
+              sheetName="Nursery Stock"
+              filename="nursery_stock.xlsx"
+              columns={STOCK_EXPORT_COLUMNS}
+              rows={exportRows}
+              disabled={loading || filteredStock.length === 0}
+              label="Export Excel"
+            />
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="relative max-w-md">

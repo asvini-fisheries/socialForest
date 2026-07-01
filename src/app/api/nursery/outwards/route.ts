@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   OUTWARD_BILL_SELECT,
   OUTWARD_LIST_SELECT,
+  OUTWARD_LINES_BILL_SELECT,
   getServiceClient,
   requireProjectAccess,
 } from '@/lib/nursery-api';
 import { normalizeSaplingLines, totalSaplingQuantity } from '@/lib/nursery-utils';
+import { flattenOutwardBillsToLines } from '@/lib/nursery-lines';
 
 const OUTWARD_LIST_WITH_ITEMS = `
   ${OUTWARD_LIST_SELECT.trim()},
@@ -15,6 +17,7 @@ const OUTWARD_LIST_WITH_ITEMS = `
 export async function GET(request: NextRequest) {
   const projectId = request.nextUrl.searchParams.get('project_id');
   const search = (request.nextUrl.searchParams.get('search') || '').trim().toLowerCase();
+  const view = request.nextUrl.searchParams.get('view');
 
   if (!projectId) {
     return NextResponse.json({ error: 'project_id required' }, { status: 400 });
@@ -27,6 +30,37 @@ export async function GET(request: NextRequest) {
 
   try {
     const service = getServiceClient();
+
+    if (view === 'lines') {
+      const { data, error } = await service
+        .from('nursery_outward_bills')
+        .select(OUTWARD_LINES_BILL_SELECT)
+        .eq('project_id', projectId)
+        .order('issue_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+      let lines = flattenOutwardBillsToLines((data || []) as Parameters<typeof flattenOutwardBillsToLines>[0]);
+      if (search) {
+        lines = lines.filter((row) => {
+          const haystack = [
+            row.log_number,
+            row.issue_category,
+            row.project_area_name,
+            row.project_area_code,
+            row.species_name,
+            row.species_code,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(search);
+        });
+      }
+      return NextResponse.json({ data: lines });
+    }
+
     const { data, error } = await service
       .from('nursery_outward_bills')
       .select(OUTWARD_LIST_WITH_ITEMS)
