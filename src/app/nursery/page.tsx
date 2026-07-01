@@ -49,7 +49,7 @@ export default function NurseryPage() {
     const supabase = createClient();
 
     const [stockRes, stakeholdersRes, speciesRes] = await Promise.all([
-      supabase.from('nursery_stock').select('*').order('name'),
+      supabase.from('nursery_stock').select('*').order('resource_name'),
       supabase.from('stakeholders').select('id, name, code').eq('is_active', true).order('name'),
       supabase
         .from('resources_materials')
@@ -81,6 +81,7 @@ export default function NurseryPage() {
   }, [loadData]);
 
   function openDialog(type: 'inward' | 'issue') {
+    setError('');
     setForm({
       stakeholder_id: '',
       resource_id: '',
@@ -106,34 +107,29 @@ export default function NurseryPage() {
 
     setSaving(true);
     setError('');
-    const supabase = createClient();
-    const base = {
-      project_id: selectedProject.id,
-      resource_id: form.resource_id,
-      quantity: qty,
-      remarks: form.remarks || null,
-    };
 
-    const { error: saveError } =
-      dialog === 'inward'
-        ? await supabase.from('nursery_inwards').insert({
-            ...base,
-            stakeholder_id: form.stakeholder_id,
-            inward_date: form.date,
-            recorded_by: user.id,
-          })
-        : await supabase.from('nursery_issues').insert({
-            ...base,
-            issue_date: form.date,
-            issue_category: form.issue_category,
-            issued_by: user.id,
-          });
-
-    if (saveError) {
-      setError(saveError.message);
-    } else {
+    try {
+      const res = await fetch('/api/nursery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          project_id: selectedProject.id,
+          type: dialog,
+          stakeholder_id: form.stakeholder_id || undefined,
+          resource_id: form.resource_id,
+          quantity: qty,
+          date: form.date,
+          issue_category: form.issue_category,
+          remarks: form.remarks || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Save failed');
       setDialog(null);
       await loadData();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Save failed');
     }
     setSaving(false);
   }
