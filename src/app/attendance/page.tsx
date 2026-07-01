@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/contexts/auth-context';
 import { createClient } from '@/lib/supabase/client';
+import { fetchAttendanceRecords, saveAttendanceRecords } from '@/lib/attendance-client';
 import type { AttendanceStatus, OrganisationEmployee } from '@/types/database';
 import { ClipboardList, Loader2, Save, Users } from 'lucide-react';
 
@@ -54,13 +55,16 @@ export default function AttendancePage() {
       return;
     }
 
-    const { data: records } = await supabase
-      .from('daily_attendance')
-      .select('*')
-      .eq('project_id', selectedProject.id)
-      .eq('attendance_date', date);
+    let records: { id: string; employee_id: string; status: string }[] = [];
+    try {
+      records = await fetchAttendanceRecords(selectedProject.id, date);
+    } catch (attErr) {
+      setError(attErr instanceof Error ? attErr.message : 'Failed to load attendance');
+      setLoading(false);
+      return;
+    }
 
-    const recordMap = new Map(records?.map((r) => [r.employee_id, r]) || []);
+    const recordMap = new Map(records.map((r) => [r.employee_id, r]));
 
     setEntries(
       (employees || []).map((emp) => {
@@ -96,25 +100,21 @@ export default function AttendancePage() {
     setSuccess('');
     const supabase = createClient();
 
-    const upserts = entries.map((e) => ({
-      project_id: selectedProject.id,
-      organisation_id: selectedProject.organisation_id,
-      employee_id: e.employee.id,
-      attendance_date: date,
-      status: e.status,
-      recorded_by: user.id,
-      ...(e.recordId ? { id: e.recordId } : {}),
-    }));
-
-    const { error: saveError } = await supabase
-      .from('daily_attendance')
-      .upsert(upserts, { onConflict: 'project_id,employee_id,attendance_date' });
-
-    if (saveError) {
-      setError(saveError.message);
-    } else {
+    try {
+      await saveAttendanceRecords(
+        selectedProject.id,
+        selectedProject.organisation_id,
+        date,
+        entries.map((e) => ({
+          employee_id: e.employee.id,
+          status: e.status,
+          record_id: e.recordId,
+        }))
+      );
       setSuccess(`Attendance saved for ${entries.length} employees`);
       await loadAttendance();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Save failed');
     }
     setSaving(false);
   }

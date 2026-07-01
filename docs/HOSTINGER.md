@@ -94,6 +94,24 @@ After saving env vars, click **Redeploy** (not just Save).
 1. hPanel → **Deployments** → **Redeploy** latest `main` commit
 2. Wait until build finishes (green / Success)
 3. Open `https://socialforest.co.in/` — should show login, not 503
+
+## Verify the latest code is live
+
+After **Redeploy**, log in and select a project. The header shows **Build xxxxxxx** (git commit short hash).
+
+| Build shown | Meaning |
+|-------------|---------|
+| `aa5229f` or newer | Latest multi-screen fixes are deployed |
+| Older / missing | Hostinger is still serving an old build — click **Redeploy** again |
+
+`git pull` on your PC only updates local files. Production updates only when Hostinger **builds and deploys** from GitHub `main`.
+
+**Local dev after pull:**
+```bash
+npm install
+npm run dev:clean
+```
+Hard-refresh the browser (`Ctrl+Shift+R`).
 4. If still 503, copy the **last 30 lines** of the runtime log and share for diagnosis
 
 ## 7. Database

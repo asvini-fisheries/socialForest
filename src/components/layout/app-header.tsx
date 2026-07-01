@@ -23,6 +23,9 @@ export function AppHeader() {
         {selectedYear?.year_label && (
           <p className="text-sm text-gray-500 mt-0.5">Financial Year: {selectedYear.year_label}</p>
         )}
+        {process.env.NEXT_PUBLIC_BUILD_ID && (
+          <p className="text-xs text-gray-400 mt-1">Build {process.env.NEXT_PUBLIC_BUILD_ID}</p>
+        )}
       </div>
     </header>
   );

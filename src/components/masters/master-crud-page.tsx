@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { getMasterTableSpec } from '@/lib/master-registry-data';
 import { filterMasterRows, hasActiveColumnFilters } from '@/lib/master-registry';
-import { buildMasterFilterOptions, enrichProjectAreaParents } from '@/lib/master-display';
+import { buildMasterFilterOptions, enrichProjectAreaParents, enrichRowsWithForeignKeys } from '@/lib/master-display';
 import { getMasterImageField, masterTableSupportsImages, uploadMasterImage, removeMasterImageFromUrl } from '@/lib/master-image';
 import { masterApiFetch, parseMasterApiError } from '@/lib/masters-api-client';
 import { filterRowsByProject, getMasterProjectScope, apiProjectFilterColumn } from '@/lib/master-project-scope';
@@ -52,7 +52,9 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
-  const [fieldOptions, setFieldOptions] = useState<Record<string, { value: string; label: string }[]>>({});
+  const [fieldOptions, setFieldOptions] = useState<
+    Record<string, { value: string; label: string; row?: Record<string, unknown> }[]>
+  >({});
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageClear, setImageClear] = useState(false);
@@ -78,16 +80,21 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     [config.columns, config.title, imageField, supportsImages]
   );
 
+  const enrichedRows = useMemo(
+    () => enrichRowsWithForeignKeys(rows, config.fields, fieldOptions),
+    [rows, config.fields, fieldOptions]
+  );
+
   const filteredRows = useMemo(
     () =>
       filterMasterRows(
-        rows,
+        enrichedRows,
         search,
         searchKeys,
         config.columnFilters,
         columnFilterValues
       ),
-    [rows, search, searchKeys, config.columnFilters, columnFilterValues]
+    [enrichedRows, search, searchKeys, config.columnFilters, columnFilterValues]
   );
 
   const hasColumnFilters = useMemo(
@@ -100,11 +107,11 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     if (!config.columnFilters) return map;
     for (const filter of config.columnFilters) {
       if (filter.mode === 'multiselect') {
-        map[filter.id] = filter.staticOptions ?? buildMasterFilterOptions(rows, filter);
+        map[filter.id] = filter.staticOptions ?? buildMasterFilterOptions(enrichedRows, filter);
       }
     }
     return map;
-  }, [config.columnFilters, rows]);
+  }, [config.columnFilters, enrichedRows]);
 
   const projectScope = useMemo(() => getMasterProjectScope(config.table), [config.table]);
 
@@ -174,7 +181,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
   useEffect(() => {
     async function loadDynamicOptions() {
       const supabase = createClient();
-      const opts: Record<string, { value: string; label: string }[]> = {};
+      const opts: Record<string, { value: string; label: string; row?: Record<string, unknown> }[]> = {};
       for (const field of config.fields) {
         if (field.optionsFrom) {
           const from = field.optionsFrom;
@@ -197,7 +204,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
                 : from.labelSuffixKey
                   ? `${String(row[from.labelKey])} (${String(row[from.labelSuffixKey])})`
                   : String(row[from.labelKey]);
-              return { value: String(row[from.valueKey]), label };
+              return { value: String(row[from.valueKey]), label, row };
             }) || [];
         }
       }

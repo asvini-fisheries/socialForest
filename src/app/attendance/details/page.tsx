@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ExcelExportButton } from '@/components/export/excel-export-button';
 import { useAuth } from '@/contexts/auth-context';
 import { createClient } from '@/lib/supabase/client';
+import { fetchAttendanceRecords } from '@/lib/attendance-client';
 import { formatDate } from '@/lib/utils';
 import { formatOrgShortName } from '@/lib/master-display';
 import type { AttendanceStatus } from '@/types/database';
@@ -86,26 +87,18 @@ export default function AttendanceDetailsPage() {
     if (!selectedProject) return;
     setLoading(true);
     setError('');
-    const supabase = createClient();
-
-    const [orgsRes, attendanceRes] = await Promise.all([
-      supabase.from('organisations').select('id, name, code').eq('is_active', true).order('name'),
-      supabase
-        .from('daily_attendance')
-        .select(
-          'id, attendance_date, status, organisation_id, organisation:organisations(name, code), employee:organisation_employees(employee_code, full_name, designation:designations(name))'
-        )
-        .eq('project_id', selectedProject.id)
-        .order('attendance_date', { ascending: false }),
-    ]);
-
-    if (attendanceRes.error) {
-      setError(attendanceRes.error.message);
+    try {
+      const supabase = createClient();
+      const [orgsRes, attendanceRows] = await Promise.all([
+        supabase.from('organisations').select('id, name, code').eq('is_active', true).order('name'),
+        fetchAttendanceRecords(selectedProject.id),
+      ]);
+      setRows(attendanceRows as AttendanceRow[]);
+      setOrganisations(orgsRes.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load attendance');
       setRows([]);
-    } else {
-      setRows((attendanceRes.data as AttendanceRow[]) || []);
     }
-    setOrganisations(orgsRes.data || []);
     setLoading(false);
   }, [selectedProject]);
 

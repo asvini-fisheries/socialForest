@@ -96,6 +96,32 @@ export function resourceCategoryKey(row: Record<string, unknown>): string {
   return String(row.category_id ?? '');
 }
 
+/** Fill missing FK join objects from loaded dropdown option rows (fallback when select join fails). */
+export function enrichRowsWithForeignKeys(
+  rows: Record<string, unknown>[],
+  fields: { name: string; optionsFrom?: { labelKey: string; labelSuffixKey?: string } }[],
+  optionsByField: Record<string, { value: string; row?: Record<string, unknown> }[]>
+): Record<string, unknown>[] {
+  return rows.map((row) => {
+    const next = { ...row };
+    for (const field of fields) {
+      if (!field.optionsFrom) continue;
+      const alias = field.name.endsWith('_id') ? field.name.slice(0, -3) : field.name;
+      if (next[alias] && typeof next[alias] === 'object') continue;
+      const id = row[field.name];
+      if (!id) continue;
+      const opt = optionsByField[field.name]?.find((o) => o.value === String(id));
+      if (!opt?.row) continue;
+      const r = opt.row;
+      const from = field.optionsFrom;
+      next[alias] = from.labelSuffixKey
+        ? { name: r[from.labelKey], code: r[from.labelSuffixKey] }
+        : { name: r[from.labelKey] };
+    }
+    return next;
+  });
+}
+
 /** Build distinct multiselect options from loaded rows */
 export function buildMasterFilterOptions(
   rows: Record<string, unknown>[],
