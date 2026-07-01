@@ -105,7 +105,10 @@ SELECT id, resource_id, quantity, 0, 0
 FROM nursery_issues;
 
 -- Project-scoped stock view (replaces global aggregation)
-CREATE OR REPLACE VIEW nursery_stock AS
+-- Must drop first: CREATE OR REPLACE cannot add/rename leading columns.
+DROP VIEW IF EXISTS nursery_stock;
+
+CREATE VIEW nursery_stock AS
 SELECT
   x.project_id,
   rm.id AS resource_id,
