@@ -15,8 +15,12 @@ export const INWARD_BILL_SELECT = `
 `;
 
 export const OUTWARD_BILL_SELECT = `
-  *,
+  id, project_id, project_area_id, issue_category, log_number, issue_date, image_url, remarks, total_amount, created_at,
   project_area:project_areas(name, code),
+  project:projects(
+    name, code,
+    organisation:organisations(name, address, city, state, gstin, header_template, footer_template)
+  ),
   items:nursery_outward_items(
     id, resource_id, quantity, unit_rate, amount,
     resource:resources_materials(name, code)

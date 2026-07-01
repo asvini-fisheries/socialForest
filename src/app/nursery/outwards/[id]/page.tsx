@@ -5,11 +5,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchOutwardBill } from '@/lib/nursery-client';
+import { downloadOutwardBillPdf, fetchOutwardBill } from '@/lib/nursery-client';
 import { formatDate, formatNumber } from '@/lib/utils';
-import { ArrowLeft, ArrowUpFromLine, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowUpFromLine, Download, Loader2 } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<string, string> = {
   plantation: 'Plantation',
@@ -37,6 +38,7 @@ export default function OutwardDetailPage() {
   const [bill, setBill] = useState<OutwardBill | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const loadBill = useCallback(async () => {
     if (!selectedProject) return;
@@ -58,6 +60,21 @@ export default function OutwardDetailPage() {
 
   const totalSaplings = (bill?.items || []).reduce((sum, item) => sum + item.quantity, 0);
 
+  async function handleDownloadPdf() {
+    if (!selectedProject || !bill) return;
+    setPdfLoading(true);
+    try {
+      await downloadOutwardBillPdf(
+        selectedProject.id,
+        bill.id,
+        `${bill.log_number || 'outward-log'}.pdf`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'PDF download failed');
+    }
+    setPdfLoading(false);
+  }
+
   if (!selectedProject) {
     return (
       <DashboardLayout>
@@ -69,12 +86,18 @@ export default function OutwardDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl">
-        <div>
-          <Link href="/nursery/outwards" className="inline-flex items-center gap-1 text-sm text-emerald-600 mb-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Outward List
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Outward Log Details</h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <Link href="/nursery/outwards" className="inline-flex items-center gap-1 text-sm text-emerald-600 mb-2">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Outward List
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">Outward Log Details</h1>
+          </div>
+          <Button variant="outline" onClick={handleDownloadPdf} disabled={pdfLoading || !bill}>
+            {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Download PDF
+          </Button>
         </div>
 
         {error && (

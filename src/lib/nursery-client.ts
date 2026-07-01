@@ -184,6 +184,24 @@ export async function fetchOutwardBill(projectId: string, id: string) {
   return json.data;
 }
 
+export async function downloadOutwardBillPdf(projectId: string, billId: string, filename: string) {
+  const res = await fetch(
+    `/api/nursery/outwards/${billId}/pdf?project_id=${encodeURIComponent(projectId)}`,
+    { headers: await authHeaders(), credentials: 'include' }
+  );
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || 'PDF download failed');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function saveOutwardBill(payload: {
   project_id: string;
   project_area_id: string;
