@@ -3,6 +3,7 @@ export type InwardDetailLine = {
   bill_id: string;
   bill_date: string;
   invoice_number: string;
+  status: string;
   stakeholder_id: string;
   stakeholder_name: string;
   stakeholder_code: string | null;
@@ -33,6 +34,7 @@ type InwardBillRow = {
   id: string;
   bill_date: string;
   invoice_number: string;
+  status?: string;
   stakeholder_id: string;
   stakeholder?: { name?: string; code?: string | null } | null;
   items?: {
@@ -69,6 +71,7 @@ export function flattenInwardBillsToLines(bills: InwardBillRow[]): InwardDetailL
         bill_id: bill.id,
         bill_date: bill.bill_date,
         invoice_number: bill.invoice_number,
+        status: bill.status || 'draft',
         stakeholder_id: bill.stakeholder_id,
         stakeholder_name: bill.stakeholder?.name || '',
         stakeholder_code: bill.stakeholder?.code || null,

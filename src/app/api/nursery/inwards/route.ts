@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
         image_url: image_url || null,
         remarks: remarks || null,
         total_amount,
+        status: 'draft',
         recorded_by: auth.user.id,
       })
       .select('id')

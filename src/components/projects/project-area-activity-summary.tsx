@@ -1,19 +1,33 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, Download, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ExcelExportButton } from '@/components/export/excel-export-button';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import {
   buildActivityTreeByCluster,
   type ClusterActivityTree,
   type DailyActivityAreaRow,
 } from '@/lib/project-activity-summaries';
+import { flattenActivityTreeForExport } from '@/lib/project-activity-report-pdf';
 import type { ProjectArea } from '@/types/database';
 
 interface ProjectAreaActivitySummaryProps {
   areas: ProjectArea[];
   entries: DailyActivityAreaRow[];
+  projectName?: string;
+  organisationName?: string;
 }
+
+const EXPORT_COLUMNS = [
+  { key: 'project_area', header: 'Project Area' },
+  { key: 'activity', header: 'Activity' },
+  { key: 'date', header: 'Date' },
+  { key: 'sub_area', header: 'Sub Area' },
+  { key: 'quantity', header: 'Quantity' },
+  { key: 'amount', header: 'Amount' },
+];
 
 function ExpandButton({
   expanded,
@@ -176,9 +190,17 @@ function ClusterNode({
   );
 }
 
-export function ProjectAreaActivitySummaryTable({ areas, entries }: ProjectAreaActivitySummaryProps) {
+export function ProjectAreaActivitySummaryTable({
+  areas,
+  entries,
+  projectName,
+  organisationName,
+}: ProjectAreaActivitySummaryProps) {
   const tree = useMemo(() => buildActivityTreeByCluster(areas, entries), [areas, entries]);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const exportRows = useMemo(() => flattenActivityTreeForExport(tree), [tree]);
 
   const toggle = (key: string) => {
     setExpandedKeys((prev) => {
@@ -200,8 +222,44 @@ export function ProjectAreaActivitySummaryTable({ areas, entries }: ProjectAreaA
   const grandQuantity = tree.reduce((sum, c) => sum + c.quantity, 0);
   const grandAmount = tree.reduce((sum, c) => sum + c.amount, 0);
 
+  async function downloadPdf() {
+    setPdfLoading(true);
+    try {
+      const res = await fetch('/api/projects/activity-report/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectName: projectName || 'Project', organisationName, tree }),
+      });
+      if (!res.ok) throw new Error('PDF export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(projectName || 'project').replace(/\s+/g, '_')}_activities.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap justify-end gap-2">
+        <ExcelExportButton
+          sheetName="Activities by Area"
+          filename="activities_by_project_area.xlsx"
+          columns={EXPORT_COLUMNS}
+          rows={exportRows}
+          disabled={exportRows.length === 0}
+          label="Export Excel"
+        />
+        <Button variant="outline" onClick={downloadPdf} disabled={pdfLoading || tree.length === 0}>
+          {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          Download PDF
+        </Button>
+      </div>
+
       <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-200">
         <span>Cluster / Project Area</span>
         <span className="text-right">Quantity</span>

@@ -85,6 +85,51 @@ export async function fetchInwardBill(projectId: string, id: string) {
   return json.data;
 }
 
+export async function updateInwardBillStatus(
+  projectId: string,
+  billId: string,
+  action: 'submit' | 'approve' | 'reject'
+) {
+  const res = await fetch(`/api/nursery/inwards/${billId}`, {
+    method: 'PATCH',
+    headers: await authHeaders(),
+    credentials: 'include',
+    body: JSON.stringify({ project_id: projectId, action }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to update bill status');
+  return json.data;
+}
+
+export async function downloadInwardBillPdf(projectId: string, billId: string, filename: string) {
+  const res = await fetch(
+    `/api/nursery/inwards/${billId}/pdf?project_id=${encodeURIComponent(projectId)}`,
+    { headers: await authHeaders(), credentials: 'include' }
+  );
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || 'PDF download failed');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function fetchStockTransactions(projectId: string, resourceId: string) {
+  const params = new URLSearchParams({ project_id: projectId, resource_id: resourceId });
+  const res = await fetch(`/api/nursery/stock/transactions?${params}`, {
+    headers: await authHeaders(),
+    credentials: 'include',
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to load stock transactions');
+  return json.data || [];
+}
+
 export async function saveInwardBill(payload: {
   project_id: string;
   stakeholder_id: string;

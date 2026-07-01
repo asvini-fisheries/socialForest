@@ -61,9 +61,9 @@ export async function requireProjectAccess(projectId: string, request?: NextRequ
 
 export const ACTIVITY_SELECT = `
   *,
-  project_activity:project_activities(activity_id, activity:activities(name)),
+  project_activity:project_activities(activity_id, activity:activities(name, code)),
   stakeholder:stakeholders(name),
   project_area:project_areas(name, code, parent_area:parent_area_id(name, code)),
   images:daily_activity_images(id, image_url),
-  resources_used:daily_activity_resources_used(id, resource_id, quantity_used, unit_rate, resource:resources_materials(name))
+  resources_used:daily_activity_resources_used(id, resource_id, quantity_used, unit_rate, resource:resources_materials(name, is_tree_species))
 `;

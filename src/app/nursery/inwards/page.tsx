@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExcelExportButton } from '@/components/export/excel-export-button';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/auth-context';
 import { fetchInwardDetailLines } from '@/lib/nursery-client';
 import type { InwardDetailLine } from '@/lib/nursery-lines';
@@ -32,6 +33,7 @@ const EMPTY_FILTERS: InwardFilters = {
 const EXPORT_COLUMNS = [
   { key: 'bill_date', header: 'Date' },
   { key: 'invoice_number', header: 'Invoice No' },
+  { key: 'status', header: 'Status' },
   { key: 'stakeholder', header: 'Stakeholder' },
   { key: 'species_name', header: 'Tree Species' },
   { key: 'quantity', header: 'Qty' },
@@ -53,6 +55,7 @@ function toExportRow(row: InwardDetailLine): Record<string, unknown> {
   return {
     bill_date: formatDate(row.bill_date),
     invoice_number: row.invoice_number,
+    status: row.status,
     stakeholder: stakeholderLabel(row),
     species_name: speciesLabel(row),
     quantity: row.quantity,
@@ -215,6 +218,7 @@ export default function NurseryInwardsPage() {
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Date</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Invoice No</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-500">Status</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Stakeholder</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Tree Species</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500">Qty</th>
@@ -233,6 +237,9 @@ export default function NurseryInwardsPage() {
                           >
                             {row.invoice_number}
                           </Link>
+                        </td>
+                        <td className="py-3 px-4">
+                          <StatusBadge status={row.status} />
                         </td>
                         <td className="py-3 px-4">{stakeholderLabel(row) || '—'}</td>
                         <td className="py-3 px-4">{speciesLabel(row) || '—'}</td>

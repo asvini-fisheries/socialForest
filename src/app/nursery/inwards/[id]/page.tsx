@@ -5,11 +5,27 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchInwardBill } from '@/lib/nursery-client';
+import {
+  downloadInwardBillPdf,
+  fetchInwardBill,
+  updateInwardBillStatus,
+} from '@/lib/nursery-client';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
-import { ArrowDownToLine, ArrowLeft, ExternalLink, Loader2 } from 'lucide-react';
+import type { BillStatus } from '@/types/database';
+import {
+  ArrowDownToLine,
+  ArrowLeft,
+  CheckCircle,
+  Download,
+  ExternalLink,
+  Loader2,
+  Send,
+  XCircle,
+} from 'lucide-react';
 
 type InwardBill = {
   id: string;
@@ -18,6 +34,7 @@ type InwardBill = {
   image_url: string | null;
   remarks: string | null;
   total_amount: number;
+  status: BillStatus;
   stakeholder?: { name?: string; code?: string } | null;
   items?: {
     id: string;
@@ -31,10 +48,16 @@ type InwardBill = {
 export default function InwardBillDetailPage() {
   const params = useParams();
   const id = String(params.id);
-  const { selectedProject } = useAuth();
+  const { selectedProject, user } = useAuth();
   const [bill, setBill] = useState<InwardBill | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [actionLoading, setActionLoading] = useState('');
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const canManage = user?.role === 'admin' || user?.role === 'organisation';
+  const totalQty = (bill?.items || []).reduce((s, i) => s + i.quantity, 0);
 
   const loadBill = useCallback(async () => {
     if (!selectedProject) return;
@@ -54,6 +77,38 @@ export default function InwardBillDetailPage() {
     loadBill();
   }, [loadBill]);
 
+  async function handleStatusAction(action: 'submit' | 'approve' | 'reject') {
+    if (!selectedProject || !bill) return;
+    setActionLoading(action);
+    setError('');
+    setSuccess('');
+    try {
+      await updateInwardBillStatus(selectedProject.id, bill.id, action);
+      setSuccess(
+        action === 'submit' ? 'Bill submitted.' : action === 'approve' ? 'Bill approved.' : 'Bill rejected.'
+      );
+      await loadBill();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Action failed');
+    }
+    setActionLoading('');
+  }
+
+  async function handleDownloadPdf() {
+    if (!selectedProject || !bill) return;
+    setPdfLoading(true);
+    try {
+      await downloadInwardBillPdf(
+        selectedProject.id,
+        bill.id,
+        `${bill.invoice_number || 'inward-bill'}.pdf`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'PDF download failed');
+    }
+    setPdfLoading(false);
+  }
+
   if (!selectedProject) {
     return (
       <DashboardLayout>
@@ -65,17 +120,48 @@ export default function InwardBillDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl">
-        <div>
-          <Link href="/nursery/inwards" className="inline-flex items-center gap-1 text-sm text-emerald-600 mb-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Inward List
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Inward Bill Details</h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <Link href="/nursery/inwards" className="inline-flex items-center gap-1 text-sm text-emerald-600 mb-2">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Inward List
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">Inward Bill Details</h1>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handleDownloadPdf} disabled={pdfLoading || !bill}>
+              {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Download PDF
+            </Button>
+            {canManage && bill?.status === 'draft' && (
+              <>
+                <Button variant="outline" onClick={() => handleStatusAction('submit')} disabled={!!actionLoading}>
+                  {actionLoading === 'submit' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Submit
+                </Button>
+                <Button onClick={() => handleStatusAction('approve')} disabled={!!actionLoading}>
+                  {actionLoading === 'approve' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Approve
+                </Button>
+              </>
+            )}
+            {canManage && bill?.status === 'submitted' && (
+              <>
+                <Button onClick={() => handleStatusAction('approve')} disabled={!!actionLoading}>
+                  {actionLoading === 'approve' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  Approve
+                </Button>
+                <Button variant="outline" onClick={() => handleStatusAction('reject')} disabled={!!actionLoading} className="text-red-600">
+                  {actionLoading === 'reject' ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                  Reject
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
-        {error && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>
-        )}
+        {error && <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>}
+        {success && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">{success}</div>}
 
         {loading ? (
           <div className="flex justify-center py-12 text-gray-400">
@@ -87,8 +173,9 @@ export default function InwardBillDetailPage() {
         ) : (
           <>
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
                 <CardTitle>{bill.invoice_number}</CardTitle>
+                <StatusBadge status={bill.status} />
               </CardHeader>
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
@@ -99,10 +186,12 @@ export default function InwardBillDetailPage() {
                   <p className="text-gray-500">Stakeholder</p>
                   <p className="font-medium">
                     {bill.stakeholder?.name || '—'}
-                    {bill.stakeholder?.code && (
-                      <span className="text-gray-400 ml-1">({bill.stakeholder.code})</span>
-                    )}
+                    {bill.stakeholder?.code && <span className="text-gray-400 ml-1">({bill.stakeholder.code})</span>}
                   </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Total Quantity</p>
+                  <p className="font-semibold text-lg">{formatNumber(totalQty)}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Total Amount</p>
@@ -111,14 +200,8 @@ export default function InwardBillDetailPage() {
                 {bill.image_url && (
                   <div>
                     <p className="text-gray-500">Invoice Image</p>
-                    <a
-                      href={bill.image_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-medium"
-                    >
-                      View attachment
-                      <ExternalLink className="w-4 h-4" />
+                    <a href={bill.image_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                      View attachment <ExternalLink className="w-4 h-4" />
                     </a>
                   </div>
                 )}
@@ -151,20 +234,21 @@ export default function InwardBillDetailPage() {
                         <tr key={item.id} className="border-b border-gray-100">
                           <td className="py-3 px-4">
                             {item.resource?.name || '—'}
-                            {item.resource?.code && (
-                              <span className="text-gray-400 ml-1">({item.resource.code})</span>
-                            )}
+                            {item.resource?.code && <span className="text-gray-400 ml-1">({item.resource.code})</span>}
                           </td>
                           <td className="py-3 px-4 text-right tabular-nums">{formatNumber(item.quantity)}</td>
                           <td className="py-3 px-4 text-right tabular-nums">{formatCurrency(item.unit_rate)}</td>
-                          <td className="py-3 px-4 text-right tabular-nums font-medium">
-                            {formatCurrency(item.amount)}
-                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums font-medium">{formatCurrency(item.amount)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                {bill.status === 'draft' && (
+                  <p className="text-sm text-amber-700 mt-3">
+                    Draft bills do not affect nursery stock until approved.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </>

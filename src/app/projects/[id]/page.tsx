@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchDailyActivities } from '@/lib/daily-activities-client';
-import { sumActivityAmount, sumActivityQuantity } from '@/lib/daily-activity-metrics';
+import { sumActivityAmount, sumTreePlantationSpeciesQuantity } from '@/lib/daily-activity-metrics';
 import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
 
 export default function ProjectDetailPage() {
@@ -92,7 +92,10 @@ export default function ProjectDetailPage() {
     [areas, activityEntries]
   );
 
-  const treesPlanted = useMemo(() => sumActivityQuantity(activityEntries), [activityEntries]);
+  const treesPlanted = useMemo(
+    () => sumTreePlantationSpeciesQuantity(activityEntries),
+    [activityEntries]
+  );
   const budgetActual = useMemo(() => sumActivityAmount(activityEntries), [activityEntries]);
 
   useEffect(() => {
@@ -278,7 +281,12 @@ export default function ProjectDetailPage() {
                     {activityError}
                   </div>
                 )}
-                <ProjectAreaActivitySummaryTable areas={areas} entries={activityEntries} />
+                <ProjectAreaActivitySummaryTable
+                  areas={areas}
+                  entries={activityEntries}
+                  projectName={project.name}
+                  organisationName={project.organisation?.name}
+                />
               </CardContent>
             </Card>
           </>

@@ -45,6 +45,7 @@ export function NurseryLineItemsEditor({ lines, species, onChange }: NurseryLine
     onChange([...lines, createEmptyLine()]);
   }
 
+  const totalQty = lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
   const total = lines.reduce((sum, line) => {
     const qty = Number(line.quantity) || 0;
     const rate = Number(line.unit_rate) || 0;
@@ -125,7 +126,10 @@ export function NurseryLineItemsEditor({ lines, species, onChange }: NurseryLine
           </tbody>
           <tfoot>
             <tr className="bg-gray-50 font-semibold">
-              <td colSpan={3} className="py-2 px-3 text-right text-gray-700">
+              <td className="py-2 px-3 text-right text-gray-700">
+                Total Qty: {formatNumber(totalQty)}
+              </td>
+              <td colSpan={2} className="py-2 px-3 text-right text-gray-700">
                 Total ({formatNumber(lines.filter((l) => Number(l.quantity) > 0).length)} lines)
               </td>
               <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(total)}</td>
