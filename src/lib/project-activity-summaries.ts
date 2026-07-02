@@ -1,10 +1,16 @@
-import { entryAmount, entryQuantity, type DailyActivityMetricRow } from '@/lib/daily-activity-metrics';
+import {
+  entryAmount,
+  entryQuantity,
+  treeSpeciesQuantity,
+  type DailyActivityMetricRow,
+} from '@/lib/daily-activity-metrics';
 import { buildProjectAreaTree } from '@/lib/project-areas-tree';
 import type { ProjectArea } from '@/types/database';
 
 export type AreaActivityLine = {
   activityName: string;
   quantity: number;
+  saplings: number;
   amount: number;
 };
 
@@ -27,6 +33,7 @@ export type DailyActivityAreaRow = DailyActivityMetricRow & {
 export type ActivityDateLine = {
   date: string;
   quantity: number;
+  saplings: number;
   amount: number;
   projectAreaName: string | null;
 };
@@ -34,6 +41,7 @@ export type ActivityDateLine = {
 export type ActivityTreeNode = {
   activityName: string;
   quantity: number;
+  saplings: number;
   amount: number;
   dates: ActivityDateLine[];
 };
@@ -43,6 +51,7 @@ export type ClusterActivityTree = {
   areaName: string;
   areaCode: string | null;
   quantity: number;
+  saplings: number;
   amount: number;
   activities: ActivityTreeNode[];
 };
@@ -65,24 +74,26 @@ function getAncestorIds(areaId: string | null, parentById: Map<string, string | 
 }
 
 function addLine(
-  store: Map<string, Map<string, { quantity: number; amount: number }>>,
+  store: Map<string, Map<string, { quantity: number; saplings: number; amount: number }>>,
   areaKey: string,
   activityName: string,
   quantity: number,
+  saplings: number,
   amount: number
 ) {
   if (!store.has(areaKey)) store.set(areaKey, new Map());
   const activityMap = store.get(areaKey)!;
-  const prev = activityMap.get(activityName) || { quantity: 0, amount: 0 };
+  const prev = activityMap.get(activityName) || { quantity: 0, saplings: 0, amount: 0 };
   activityMap.set(activityName, {
     quantity: prev.quantity + quantity,
+    saplings: prev.saplings + saplings,
     amount: prev.amount + amount,
   });
 }
 
 function toSummary(
   areaKey: string,
-  activityMap: Map<string, { quantity: number; amount: number }>,
+  activityMap: Map<string, { quantity: number; saplings: number; amount: number }>,
   areaById: Map<string, ProjectArea>
 ): AreaActivitySummary {
   const area = areaKey === WHOLE_PROJECT_KEY ? null : areaById.get(areaKey);
@@ -90,6 +101,7 @@ function toSummary(
     .map(([activityName, values]) => ({
       activityName,
       quantity: values.quantity,
+      saplings: values.saplings,
       amount: values.amount,
     }))
     .sort((a, b) => a.activityName.localeCompare(b.activityName));
@@ -112,20 +124,21 @@ export function buildRolledUpSummariesByArea(
 ): Map<string, AreaActivitySummary> {
   const parentById = new Map(areas.map((a) => [a.id, a.parent_area_id]));
   const areaById = new Map(areas.map((a) => [a.id, a]));
-  const store = new Map<string, Map<string, { quantity: number; amount: number }>>();
+  const store = new Map<string, Map<string, { quantity: number; saplings: number; amount: number }>>();
 
   for (const entry of entries) {
     const activityName = entry.project_activity?.activity?.name || 'Other';
     const quantity = entryQuantity(entry);
+    const saplings = treeSpeciesQuantity(entry);
     const amount = entryAmount(entry);
 
     if (!entry.project_area_id) {
-      addLine(store, WHOLE_PROJECT_KEY, activityName, quantity, amount);
+      addLine(store, WHOLE_PROJECT_KEY, activityName, quantity, saplings, amount);
       continue;
     }
 
     for (const areaId of getAncestorIds(entry.project_area_id, parentById)) {
-      addLine(store, areaId, activityName, quantity, amount);
+      addLine(store, areaId, activityName, quantity, saplings, amount);
     }
   }
 
@@ -142,12 +155,19 @@ export function buildDirectSummariesByArea(
   entries: DailyActivityAreaRow[]
 ): AreaActivitySummary[] {
   const areaById = new Map(areas.map((a) => [a.id, a]));
-  const store = new Map<string, Map<string, { quantity: number; amount: number }>>();
+  const store = new Map<string, Map<string, { quantity: number; saplings: number; amount: number }>>();
 
   for (const entry of entries) {
     const activityName = entry.project_activity?.activity?.name || 'Other';
     const key = bucketKey(entry.project_area_id);
-    addLine(store, key, activityName, entryQuantity(entry), entryAmount(entry));
+    addLine(
+      store,
+      key,
+      activityName,
+      entryQuantity(entry),
+      treeSpeciesQuantity(entry),
+      entryAmount(entry)
+    );
   }
 
   const summaries = [...store.entries()].map(([key, activityMap]) =>
@@ -212,7 +232,7 @@ export function buildActivityTreeByCluster(
   const areaById = new Map(areas.map((a) => [a.id, a]));
   const parentById = new Map(areas.map((a) => [a.id, a.parent_area_id]));
 
-  type DateBucket = { quantity: number; amount: number; areaNames: Set<string> };
+  type DateBucket = { quantity: number; saplings: number; amount: number; areaNames: Set<string> };
   type ActivityBucket = Map<string, Map<string, DateBucket>>;
   const clusterStore = new Map<string, ActivityBucket>();
 
@@ -224,6 +244,7 @@ export function buildActivityTreeByCluster(
     const activityName = entry.project_activity?.activity?.name || 'Other';
     const date = entry.activity_date || '';
     const qty = entryQuantity(entry);
+    const saplings = treeSpeciesQuantity(entry);
     const amt = entryAmount(entry);
     const areaName =
       entry.project_area?.name ||
@@ -235,10 +256,11 @@ export function buildActivityTreeByCluster(
     if (!actMap.has(activityName)) actMap.set(activityName, new Map());
     const dateMap = actMap.get(activityName)!;
 
-    const prev = dateMap.get(date) || { quantity: 0, amount: 0, areaNames: new Set<string>() };
+    const prev = dateMap.get(date) || { quantity: 0, saplings: 0, amount: 0, areaNames: new Set<string>() };
     if (areaName) prev.areaNames.add(areaName);
     dateMap.set(date, {
       quantity: prev.quantity + qty,
+      saplings: prev.saplings + saplings,
       amount: prev.amount + amt,
       areaNames: prev.areaNames,
     });
@@ -255,6 +277,7 @@ export function buildActivityTreeByCluster(
         .map(([date, bucket]) => ({
           date,
           quantity: bucket.quantity,
+          saplings: bucket.saplings,
           amount: bucket.amount,
           projectAreaName:
             bucket.areaNames.size === 0
@@ -268,6 +291,7 @@ export function buildActivityTreeByCluster(
       activities.push({
         activityName,
         quantity: dates.reduce((s, d) => s + d.quantity, 0),
+        saplings: dates.reduce((s, d) => s + d.saplings, 0),
         amount: dates.reduce((s, d) => s + d.amount, 0),
         dates,
       });
@@ -280,6 +304,7 @@ export function buildActivityTreeByCluster(
       areaName: area?.name ?? 'Whole project',
       areaCode: area?.code ?? null,
       quantity: activities.reduce((s, a) => s + a.quantity, 0),
+      saplings: activities.reduce((s, a) => s + a.saplings, 0),
       amount: activities.reduce((s, a) => s + a.amount, 0),
       activities,
     });

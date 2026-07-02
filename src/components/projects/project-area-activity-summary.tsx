@@ -26,6 +26,7 @@ const EXPORT_COLUMNS = [
   { key: 'date', header: 'Date' },
   { key: 'sub_area', header: 'Sub Area' },
   { key: 'quantity', header: 'Quantity' },
+  { key: 'saplings', header: 'Saplings' },
   { key: 'amount', header: 'Amount' },
 ];
 
@@ -60,15 +61,16 @@ function DateRows({
 }) {
   return (
     <div className="border-l-2 border-gray-200 ml-3" style={{ marginLeft: depth * 12 + 12 }}>
-      <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
         <span>Date</span>
         <span className="text-right">Quantity</span>
+        <span className="text-right">Saplings</span>
         <span className="text-right">Amount</span>
       </div>
       {dates.map((line) => (
         <div
           key={line.date}
-          className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-sm border-b border-gray-50 last:border-0 hover:bg-gray-50/80"
+          className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 text-sm border-b border-gray-50 last:border-0 hover:bg-gray-50/80"
         >
           <div>
             <p className="text-gray-900">{line.date ? formatDate(line.date) : '—'}</p>
@@ -78,6 +80,9 @@ function DateRows({
           </div>
           <span className="text-right tabular-nums text-gray-900 self-center">
             {line.quantity ? formatNumber(line.quantity) : '—'}
+          </span>
+          <span className="text-right tabular-nums text-gray-900 self-center">
+            {line.saplings ? formatNumber(line.saplings) : '—'}
           </span>
           <span className="text-right tabular-nums text-gray-900 self-center">
             {line.amount ? formatCurrency(line.amount) : '—'}
@@ -122,6 +127,9 @@ function ActivityNode({
         </div>
         <div className="flex gap-4 shrink-0 tabular-nums text-gray-800">
           <span>{formatNumber(activity.quantity)}</span>
+          <span className="min-w-[4rem] text-right">
+            {activity.saplings ? formatNumber(activity.saplings) : '—'}
+          </span>
           <span className="min-w-[5.5rem] text-right">{formatCurrency(activity.amount)}</span>
         </div>
       </div>
@@ -164,14 +172,18 @@ function ClusterNode({
         </div>
         <div className="flex gap-4 shrink-0 tabular-nums font-semibold text-gray-900">
           <span>{formatNumber(cluster.quantity)}</span>
+          <span className="min-w-[4rem] text-right">
+            {cluster.saplings ? formatNumber(cluster.saplings) : '—'}
+          </span>
           <span className="min-w-[5.5rem] text-right">{formatCurrency(cluster.amount)}</span>
         </div>
       </div>
       {expanded && hasActivities && (
         <div className="p-2 space-y-1 bg-white">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-1 text-xs font-medium text-gray-400">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1 text-xs font-medium text-gray-400">
             <span>Activity</span>
             <span className="text-right">Quantity</span>
+            <span className="text-right">Saplings</span>
             <span className="text-right">Amount</span>
           </div>
           {cluster.activities.map((activity) => (
@@ -220,6 +232,7 @@ export function ProjectAreaActivitySummaryTable({
   }
 
   const grandQuantity = tree.reduce((sum, c) => sum + c.quantity, 0);
+  const grandSaplings = tree.reduce((sum, c) => sum + c.saplings, 0);
   const grandAmount = tree.reduce((sum, c) => sum + c.amount, 0);
 
   async function downloadPdf() {
@@ -260,9 +273,10 @@ export function ProjectAreaActivitySummaryTable({
         </Button>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-200">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-200">
         <span>Cluster / Project Area</span>
         <span className="text-right">Quantity</span>
+        <span className="text-right">Saplings</span>
         <span className="text-right">Amount</span>
       </div>
 
@@ -275,9 +289,12 @@ export function ProjectAreaActivitySummaryTable({
         />
       ))}
 
-      <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-3 rounded-lg bg-gray-50 font-semibold text-sm text-gray-900 border-t-2 border-gray-200">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-3 rounded-lg bg-gray-50 font-semibold text-sm text-gray-900 border-t-2 border-gray-200">
         <span>Grand total</span>
         <span className="text-right tabular-nums">{formatNumber(grandQuantity)}</span>
+        <span className="text-right tabular-nums min-w-[4rem]">
+          {grandSaplings ? formatNumber(grandSaplings) : '—'}
+        </span>
         <span className="text-right tabular-nums min-w-[5.5rem]">{formatCurrency(grandAmount)}</span>
       </div>
     </div>

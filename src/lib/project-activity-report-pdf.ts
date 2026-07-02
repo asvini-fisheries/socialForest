@@ -24,6 +24,7 @@ export function flattenActivityTreeForExport(tree: ClusterActivityTree[]) {
           date: line.date ? formatDate(line.date) : '',
           sub_area: line.projectAreaName || '',
           quantity: line.quantity,
+          saplings: line.saplings,
           amount: line.amount,
         });
       }
@@ -34,6 +35,7 @@ export function flattenActivityTreeForExport(tree: ClusterActivityTree[]) {
           date: '',
           sub_area: '',
           quantity: activity.quantity,
+          saplings: activity.saplings,
           amount: activity.amount,
         });
       }
@@ -71,6 +73,7 @@ export function buildProjectActivityReportPdf(input: ProjectActivityReportInput)
             line.date ? formatDate(line.date) : '—',
             line.projectAreaName || '—',
             String(line.quantity || 0),
+            String(line.saplings || 0),
             pdfCurrency(line.amount || 0),
           ]);
         }
@@ -81,6 +84,7 @@ export function buildProjectActivityReportPdf(input: ProjectActivityReportInput)
           '—',
           '—',
           String(activity.quantity),
+          String(activity.saplings),
           pdfCurrency(activity.amount),
         ]);
       }
@@ -89,7 +93,7 @@ export function buildProjectActivityReportPdf(input: ProjectActivityReportInput)
 
   autoTable(doc, {
     startY: y,
-    head: [['Project Area', 'Activity', 'Date', 'Sub Area', 'Quantity', 'Amount']],
+    head: [['Project Area', 'Activity', 'Date', 'Sub Area', 'Quantity', 'Saplings', 'Amount']],
     body,
     theme: 'grid',
     headStyles: { fillColor: [16, 185, 129], textColor: 255, fontSize: 8 },

@@ -27,6 +27,14 @@ export function treePlantationSpeciesQuantity(entry: DailyActivityMetricRow): nu
   }, 0);
 }
 
+/** Sum quantities for all resources marked as tree species */
+export function treeSpeciesQuantity(entry: DailyActivityMetricRow): number {
+  return (entry.resources_used || []).reduce((sum, row) => {
+    if (!row.resource?.is_tree_species) return sum;
+    return sum + (Number(row.quantity_used) || 0);
+  }, 0);
+}
+
 export function sumTreePlantationSpeciesQuantity(entries: DailyActivityMetricRow[]): number {
   return entries.reduce((sum, entry) => sum + treePlantationSpeciesQuantity(entry), 0);
 }
