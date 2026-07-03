@@ -3,6 +3,7 @@ import {
   entryQuantity,
   treeSpeciesQuantity,
   type DailyActivityMetricRow,
+  type DailyActivityResourceRow,
 } from '@/lib/daily-activity-metrics';
 import { buildProjectAreaTree } from '@/lib/project-areas-tree';
 import type { ProjectArea } from '@/types/database';
@@ -25,17 +26,28 @@ export type AreaActivitySummary = {
 };
 
 export type DailyActivityAreaRow = DailyActivityMetricRow & {
+  id?: string;
   project_area_id: string | null;
   activity_date?: string;
   project_area?: { name?: string; code?: string | null } | null;
+  stakeholder?: { name?: string } | null;
 };
 
-export type ActivityDateLine = {
+export type ActivityResourceDetail = {
+  name: string;
+  quantity: number;
+  isTreeSpecies?: boolean;
+};
+
+export type ActivityDetailLine = {
+  id: string;
   date: string;
+  projectAreaName: string | null;
+  stakeholderName: string | null;
+  resources: ActivityResourceDetail[];
   quantity: number;
   saplings: number;
   amount: number;
-  projectAreaName: string | null;
 };
 
 export type ActivityTreeNode = {
@@ -43,7 +55,7 @@ export type ActivityTreeNode = {
   quantity: number;
   saplings: number;
   amount: number;
-  dates: ActivityDateLine[];
+  details: ActivityDetailLine[];
 };
 
 export type ClusterActivityTree = {
@@ -224,6 +236,21 @@ function sortByCode(a: ProjectArea, b: ProjectArea) {
   return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
 }
 
+export function mapActivityResources(
+  resources: DailyActivityResourceRow[] | null | undefined
+): ActivityResourceDetail[] {
+  return (resources || []).map((row) => ({
+    name: row.resource?.name || 'Resource',
+    quantity: Number(row.quantity_used) || 0,
+    isTreeSpecies: !!row.resource?.is_tree_species,
+  }));
+}
+
+export function formatActivityResourcesLabel(resources: ActivityResourceDetail[]): string {
+  if (!resources.length) return '';
+  return resources.map((r) => `${r.name}: ${r.quantity}`).join(', ');
+}
+
 /** Cluster → activity → date tree for Activities by Project Area. */
 export function buildActivityTreeByCluster(
   areas: ProjectArea[],
@@ -232,8 +259,7 @@ export function buildActivityTreeByCluster(
   const areaById = new Map(areas.map((a) => [a.id, a]));
   const parentById = new Map(areas.map((a) => [a.id, a.parent_area_id]));
 
-  type DateBucket = { quantity: number; saplings: number; amount: number; areaNames: Set<string> };
-  type ActivityBucket = Map<string, Map<string, DateBucket>>;
+  type ActivityBucket = Map<string, ActivityDetailLine[]>;
   const clusterStore = new Map<string, ActivityBucket>();
 
   const clusterKey = (areaId: string | null) => bucketKey(areaId);
@@ -253,16 +279,21 @@ export function buildActivityTreeByCluster(
 
     if (!clusterStore.has(cKey)) clusterStore.set(cKey, new Map());
     const actMap = clusterStore.get(cKey)!;
-    if (!actMap.has(activityName)) actMap.set(activityName, new Map());
-    const dateMap = actMap.get(activityName)!;
+    if (!actMap.has(activityName)) actMap.set(activityName, []);
 
-    const prev = dateMap.get(date) || { quantity: 0, saplings: 0, amount: 0, areaNames: new Set<string>() };
-    if (areaName) prev.areaNames.add(areaName);
-    dateMap.set(date, {
-      quantity: prev.quantity + qty,
-      saplings: prev.saplings + saplings,
-      amount: prev.amount + amt,
-      areaNames: prev.areaNames,
+    const lineId =
+      entry.id ||
+      `${cKey}:${activityName}:${date}:${entry.project_area_id || 'none'}:${actMap.get(activityName)!.length}`;
+
+    actMap.get(activityName)!.push({
+      id: lineId,
+      date,
+      projectAreaName: areaName,
+      stakeholderName: entry.stakeholder?.name || null,
+      resources: mapActivityResources(entry.resources_used),
+      quantity: qty,
+      saplings,
+      amount: amt,
     });
   }
 
@@ -272,28 +303,19 @@ export function buildActivityTreeByCluster(
     const area = cKey === WHOLE_PROJECT_KEY ? null : areaById.get(cKey);
     const activities: ActivityTreeNode[] = [];
 
-    for (const [activityName, dateMap] of actMap) {
-      const dates: ActivityDateLine[] = [...dateMap.entries()]
-        .map(([date, bucket]) => ({
-          date,
-          quantity: bucket.quantity,
-          saplings: bucket.saplings,
-          amount: bucket.amount,
-          projectAreaName:
-            bucket.areaNames.size === 0
-              ? null
-              : bucket.areaNames.size === 1
-                ? [...bucket.areaNames][0]
-                : [...bucket.areaNames].sort().join(', '),
-        }))
-        .sort((a, b) => b.date.localeCompare(a.date));
+    for (const [activityName, details] of actMap) {
+      const sortedDetails = [...details].sort((a, b) => {
+        const byDate = b.date.localeCompare(a.date);
+        if (byDate !== 0) return byDate;
+        return (a.projectAreaName || '').localeCompare(b.projectAreaName || '');
+      });
 
       activities.push({
         activityName,
-        quantity: dates.reduce((s, d) => s + d.quantity, 0),
-        saplings: dates.reduce((s, d) => s + d.saplings, 0),
-        amount: dates.reduce((s, d) => s + d.amount, 0),
-        dates,
+        quantity: sortedDetails.reduce((s, d) => s + d.quantity, 0),
+        saplings: sortedDetails.reduce((s, d) => s + d.saplings, 0),
+        amount: sortedDetails.reduce((s, d) => s + d.amount, 0),
+        details: sortedDetails,
       });
     }
 

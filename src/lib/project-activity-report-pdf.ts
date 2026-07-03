@@ -1,7 +1,10 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDate } from '@/lib/utils';
-import type { ClusterActivityTree } from '@/lib/project-activity-summaries';
+import {
+  formatActivityResourcesLabel,
+  type ClusterActivityTree,
+} from '@/lib/project-activity-summaries';
 
 function pdfCurrency(amount: number): string {
   return `Rs. ${Math.round(amount).toLocaleString('en-IN')}`;
@@ -17,23 +20,27 @@ export function flattenActivityTreeForExport(tree: ClusterActivityTree[]) {
   const rows: Record<string, unknown>[] = [];
   for (const cluster of tree) {
     for (const activity of cluster.activities) {
-      for (const line of activity.dates) {
+      for (const line of activity.details) {
         rows.push({
           project_area: cluster.areaName,
           activity: activity.activityName,
           date: line.date ? formatDate(line.date) : '',
           sub_area: line.projectAreaName || '',
+          stakeholder: line.stakeholderName || '',
+          resources: formatActivityResourcesLabel(line.resources),
           quantity: line.quantity,
           saplings: line.saplings,
           amount: line.amount,
         });
       }
-      if (!activity.dates.length) {
+      if (!activity.details.length) {
         rows.push({
           project_area: cluster.areaName,
           activity: activity.activityName,
           date: '',
           sub_area: '',
+          stakeholder: '',
+          resources: '',
           quantity: activity.quantity,
           saplings: activity.saplings,
           amount: activity.amount,
@@ -65,13 +72,15 @@ export function buildProjectActivityReportPdf(input: ProjectActivityReportInput)
   const body: string[][] = [];
   for (const cluster of input.tree) {
     for (const activity of cluster.activities) {
-      if (activity.dates.length) {
-        for (const line of activity.dates) {
+      if (activity.details.length) {
+        for (const line of activity.details) {
           body.push([
             cluster.areaName,
             activity.activityName,
             line.date ? formatDate(line.date) : '—',
             line.projectAreaName || '—',
+            line.stakeholderName || '—',
+            formatActivityResourcesLabel(line.resources) || '—',
             String(line.quantity || 0),
             String(line.saplings || 0),
             pdfCurrency(line.amount || 0),
@@ -81,6 +90,8 @@ export function buildProjectActivityReportPdf(input: ProjectActivityReportInput)
         body.push([
           cluster.areaName,
           activity.activityName,
+          '—',
+          '—',
           '—',
           '—',
           String(activity.quantity),
@@ -93,7 +104,9 @@ export function buildProjectActivityReportPdf(input: ProjectActivityReportInput)
 
   autoTable(doc, {
     startY: y,
-    head: [['Project Area', 'Activity', 'Date', 'Sub Area', 'Quantity', 'Saplings', 'Amount']],
+    head: [
+      ['Project Area', 'Activity', 'Date', 'Sub Area', 'Stakeholder', 'Resources', 'Quantity', 'Saplings', 'Amount'],
+    ],
     body,
     theme: 'grid',
     headStyles: { fillColor: [16, 185, 129], textColor: 255, fontSize: 8 },

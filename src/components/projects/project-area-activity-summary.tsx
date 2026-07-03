@@ -7,6 +7,7 @@ import { ExcelExportButton } from '@/components/export/excel-export-button';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/utils';
 import {
   buildActivityTreeByCluster,
+  formatActivityResourcesLabel,
   type ClusterActivityTree,
   type DailyActivityAreaRow,
 } from '@/lib/project-activity-summaries';
@@ -25,6 +26,8 @@ const EXPORT_COLUMNS = [
   { key: 'activity', header: 'Activity' },
   { key: 'date', header: 'Date' },
   { key: 'sub_area', header: 'Sub Area' },
+  { key: 'stakeholder', header: 'Stakeholder' },
+  { key: 'resources', header: 'Resources' },
   { key: 'quantity', header: 'Quantity' },
   { key: 'saplings', header: 'Saplings' },
   { key: 'amount', header: 'Amount' },
@@ -52,43 +55,56 @@ function ExpandButton({
   );
 }
 
-function DateRows({
-  dates,
+function DetailRows({
+  details,
   depth,
 }: {
-  dates: ClusterActivityTree['activities'][0]['dates'];
+  details: ClusterActivityTree['activities'][0]['details'];
   depth: number;
 }) {
   return (
     <div className="border-l-2 border-gray-200 ml-3" style={{ marginLeft: depth * 12 + 12 }}>
       <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
-        <span>Date</span>
+        <span>Date / Details</span>
         <span className="text-right">Quantity</span>
         <span className="text-right">Saplings</span>
         <span className="text-right">Amount</span>
       </div>
-      {dates.map((line) => (
-        <div
-          key={line.date}
-          className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 text-sm border-b border-gray-50 last:border-0 hover:bg-gray-50/80"
-        >
-          <div>
-            <p className="text-gray-900">{line.date ? formatDate(line.date) : '—'}</p>
-            {line.projectAreaName && (
-              <p className="text-xs text-gray-500 mt-0.5">{line.projectAreaName}</p>
-            )}
+      {details.map((line) => {
+        const resourcesLabel = formatActivityResourcesLabel(line.resources);
+        return (
+          <div
+            key={line.id}
+            className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 text-sm border-b border-gray-50 last:border-0 hover:bg-gray-50/80"
+          >
+            <div className="min-w-0">
+              <p className="text-gray-900">{line.date ? formatDate(line.date) : '—'}</p>
+              {line.projectAreaName && (
+                <p className="text-xs text-gray-500 mt-0.5">{line.projectAreaName}</p>
+              )}
+              {line.stakeholderName && (
+                <p className="text-xs text-gray-600 mt-0.5">
+                  <span className="text-gray-400">Stakeholder:</span> {line.stakeholderName}
+                </p>
+              )}
+              {resourcesLabel && (
+                <p className="text-xs text-gray-600 mt-0.5">
+                  <span className="text-gray-400">Resources:</span> {resourcesLabel}
+                </p>
+              )}
+            </div>
+            <span className="text-right tabular-nums text-gray-900 self-center">
+              {line.quantity ? formatNumber(line.quantity) : '—'}
+            </span>
+            <span className="text-right tabular-nums text-gray-900 self-center">
+              {line.saplings ? formatNumber(line.saplings) : '—'}
+            </span>
+            <span className="text-right tabular-nums text-gray-900 self-center">
+              {line.amount ? formatCurrency(line.amount) : '—'}
+            </span>
           </div>
-          <span className="text-right tabular-nums text-gray-900 self-center">
-            {line.quantity ? formatNumber(line.quantity) : '—'}
-          </span>
-          <span className="text-right tabular-nums text-gray-900 self-center">
-            {line.saplings ? formatNumber(line.saplings) : '—'}
-          </span>
-          <span className="text-right tabular-nums text-gray-900 self-center">
-            {line.amount ? formatCurrency(line.amount) : '—'}
-          </span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -108,13 +124,13 @@ function ActivityNode({
 }) {
   const key = `activity:${clusterId}:${activity.activityName}`;
   const expanded = expandedKeys.has(key);
-  const hasDates = activity.dates.length > 0;
+  const hasDetails = activity.details.length > 0;
 
   return (
     <div style={{ marginLeft: depth * 12 }}>
       <div className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-emerald-50/60 text-sm">
         <div className="flex items-center gap-2 min-w-0">
-          {hasDates ? (
+          {hasDetails ? (
             <ExpandButton
               expanded={expanded}
               onToggle={() => onToggle(key)}
@@ -133,7 +149,7 @@ function ActivityNode({
           <span className="min-w-[5.5rem] text-right">{formatCurrency(activity.amount)}</span>
         </div>
       </div>
-      {expanded && hasDates && <DateRows dates={activity.dates} depth={depth + 1} />}
+      {expanded && hasDetails && <DetailRows details={activity.details} depth={depth + 1} />}
     </div>
   );
 }
