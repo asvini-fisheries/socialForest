@@ -10,7 +10,7 @@ import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
 import { ProjectAreasTree } from '@/components/projects/project-areas-tree';
 import { ProjectAreaActivitySummaryTable } from '@/components/projects/project-area-activity-summary';
 import { useAuth } from '@/contexts/auth-context';
-import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
+import { formatCurrency, formatNumber } from '@/lib/utils';
 import type { Project, ProjectArea } from '@/types/database';
 import type { DailyActivityAreaRow } from '@/lib/project-activity-summaries';
 import { buildRolledUpSummariesByArea } from '@/lib/project-activity-summaries';
@@ -19,7 +19,6 @@ import {
   TreePine,
   MapPin,
   IndianRupee,
-  Handshake,
   Calendar,
   Loader2,
   Layers,
@@ -54,9 +53,7 @@ export default function ProjectDetailPage() {
     const [projectRes, areasRes] = await Promise.all([
       supabase
         .from('projects')
-        .select(
-          '*, year:years(year_label), csr_partner:csr_partners(name, code), organisation:organisations(name, code)'
-        )
+        .select('*, year:years(year_label), organisation:organisations(name, code)')
         .eq('id', id)
         .single(),
       supabase
@@ -220,41 +217,6 @@ export default function ProjectDetailPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Handshake className="w-5 h-5 text-emerald-600" />
-                    Partners
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div>
-                    <p className="text-gray-500">CSR Partner</p>
-                    <p className="font-medium">{project.csr_partner?.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Organisation</p>
-                    <p className="font-medium">{project.organisation?.name}</p>
-                  </div>
-                  {project.location && (
-                    <div>
-                      <p className="text-gray-500">Location</p>
-                      <p className="font-medium">{project.location}</p>
-                    </div>
-                  )}
-                  {(project.start_date || project.end_date) && (
-                    <div>
-                      <p className="text-gray-500">Duration</p>
-                      <p className="font-medium">
-                        {project.start_date ? formatDate(project.start_date) : '—'}
-                        {' → '}
-                        {project.end_date ? formatDate(project.end_date) : '—'}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
