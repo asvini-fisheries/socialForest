@@ -22,6 +22,7 @@ export type AreaActivitySummary = {
   level: number;
   lines: AreaActivityLine[];
   totalQuantity: number;
+  totalSaplings: number;
   totalAmount: number;
 };
 
@@ -125,6 +126,7 @@ function toSummary(
     level: area?.level ?? 0,
     lines,
     totalQuantity: lines.reduce((sum, line) => sum + line.quantity, 0),
+    totalSaplings: lines.reduce((sum, line) => sum + line.saplings, 0),
     totalAmount: lines.reduce((sum, line) => sum + line.amount, 0),
   };
 }

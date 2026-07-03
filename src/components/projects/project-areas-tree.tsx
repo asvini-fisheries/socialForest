@@ -17,24 +17,31 @@ function ActivitySummaryLines({ summary }: { summary: AreaActivitySummary }) {
 
   return (
     <div className="mt-2 mb-2 ml-8 rounded-lg border border-emerald-100 bg-emerald-50/50 text-xs overflow-hidden">
-      <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 border-b border-emerald-100 font-medium text-gray-500">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 border-b border-emerald-100 font-medium text-gray-500">
         <span>Activity</span>
         <span className="text-right">Qty</span>
+        <span className="text-right">Trees</span>
         <span className="text-right">Amount</span>
       </div>
       {summary.lines.map((line) => (
         <div
           key={line.activityName}
-          className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-1.5 border-b border-emerald-50 last:border-0 text-gray-700"
+          className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1.5 border-b border-emerald-50 last:border-0 text-gray-700"
         >
           <span className="truncate">{line.activityName}</span>
           <span className="text-right tabular-nums">{line.quantity ? formatNumber(line.quantity) : '—'}</span>
+          <span className="text-right tabular-nums min-w-[3rem]">
+            {line.saplings ? formatNumber(line.saplings) : '—'}
+          </span>
           <span className="text-right tabular-nums">{line.amount ? formatCurrency(line.amount) : '—'}</span>
         </div>
       ))}
-      <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 bg-emerald-100/60 font-semibold text-gray-800">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 bg-emerald-100/60 font-semibold text-gray-800">
         <span>Area total</span>
         <span className="text-right tabular-nums">{formatNumber(summary.totalQuantity)}</span>
+        <span className="text-right tabular-nums min-w-[3rem]">
+          {summary.totalSaplings ? formatNumber(summary.totalSaplings) : '—'}
+        </span>
         <span className="text-right tabular-nums">{formatCurrency(summary.totalAmount)}</span>
       </div>
     </div>
