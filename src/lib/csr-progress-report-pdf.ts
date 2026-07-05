@@ -19,6 +19,82 @@ function formatPdfNumber(value: number): string {
 const activitySubtotalFill: [number, number, number] = [236, 253, 245];
 const clusterSubtotalFill: [number, number, number] = [209, 250, 229];
 
+function pctLabel(progressPct: number): string {
+  return `${progressPct.toFixed(1)}%`;
+}
+
+function buildClusterBudgetActualRows(
+  clusterBudgetActuals: CsrProgressReportData['clusterBudgetActuals']
+): RowInput[] {
+  return clusterBudgetActuals.map((cluster) => [
+    cluster.areaCode ? `${cluster.areaName} (${cluster.areaCode})` : cluster.areaName,
+    pdfCurrency(cluster.budgetAmount),
+    pdfCurrency(cluster.actualAmount),
+    pctLabel(cluster.progressPct),
+  ]);
+}
+
+function buildActivityBudgetActualRows(
+  clusterBudgetActuals: CsrProgressReportData['clusterBudgetActuals']
+): RowInput[] {
+  const rows: RowInput[] = [];
+
+  for (const cluster of clusterBudgetActuals) {
+    for (const activity of cluster.activities) {
+      rows.push([
+        cluster.areaCode ? `${cluster.areaName} (${cluster.areaCode})` : cluster.areaName,
+        activity.activityName,
+        pdfCurrency(activity.budgetAmount),
+        pdfCurrency(activity.actualAmount),
+        pctLabel(activity.progressPct),
+      ]);
+    }
+
+    if (cluster.activities.length > 1) {
+      rows.push([
+        {
+          content: `Subtotal — ${cluster.areaName}`,
+          colSpan: 2,
+          styles: {
+            fillColor: clusterSubtotalFill,
+            fontStyle: 'bold',
+            textColor: 20,
+          },
+        },
+        {
+          content: pdfCurrency(cluster.budgetAmount),
+          styles: {
+            fillColor: clusterSubtotalFill,
+            fontStyle: 'bold',
+            halign: 'right',
+            textColor: 20,
+          },
+        },
+        {
+          content: pdfCurrency(cluster.actualAmount),
+          styles: {
+            fillColor: clusterSubtotalFill,
+            fontStyle: 'bold',
+            halign: 'right',
+            textColor: 20,
+          },
+        },
+        {
+          content: pctLabel(cluster.progressPct),
+          styles: {
+            fillColor: clusterSubtotalFill,
+            fontStyle: 'bold',
+            halign: 'right',
+            textColor: 20,
+          },
+        },
+      ]);
+    }
+  }
+
+  return rows;
+}
+
 function buildActivityDetailRows(tree: ClusterActivityTree[]): RowInput[] {
   const rows: RowInput[] = [];
 
@@ -245,6 +321,69 @@ export function buildCsrProgressReportPdf(data: CsrProgressReportData): Uint8Arr
 
   y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 24;
 
+  const showBudgetComparison =
+    data.summary.hasActivityBudgets && data.clusterBudgetActuals.length > 0;
+
+  if (showBudgetComparison) {
+    doc.addPage();
+    y = margin;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(20);
+    doc.text('Cluster-wise Budget & Actuals Summary', margin, y);
+    y += 14;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Cluster', 'Budget', 'Actual', 'Progress']],
+      body: buildClusterBudgetActualRows(data.clusterBudgetActuals),
+      theme: 'grid',
+      headStyles: { fillColor: [245, 158, 11], textColor: 255, fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      margin: { left: margin, right: margin },
+    });
+
+    y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 20;
+    y = ensureSpace(doc, y, 160, margin);
+
+    const clusterLabels = data.clusterBudgetActuals.map(
+      (cluster) => cluster.areaCode || cluster.areaName
+    );
+    y = drawGroupedHorizontalBarChart(doc, {
+      x: margin,
+      y,
+      width: pageWidth - margin * 2,
+      barHeight: 12,
+      rowGap: 10,
+      title: 'Budget vs Actual by Cluster',
+      categories: clusterLabels,
+      series: [
+        {
+          label: 'Budget',
+          color: [203, 213, 225],
+          values: data.clusterBudgetActuals.map((cluster) => cluster.budgetAmount),
+        },
+        {
+          label: 'Actual',
+          color: [245, 158, 11],
+          values: data.clusterBudgetActuals.map((cluster) => cluster.actualAmount),
+        },
+      ],
+    });
+
+    y = ensureSpace(doc, y, 120, margin);
+    y = drawProgressBarChart(doc, {
+      x: margin,
+      y,
+      width: pageWidth - margin * 2,
+      rowHeight: 12,
+      rowGap: 10,
+      title: 'Budget Utilisation by Cluster (%)',
+      categories: clusterLabels,
+      values: data.clusterBudgetActuals.map((cluster) => cluster.progressPct),
+    });
+  }
+
   const clusterLabels = data.clusters.map((cluster) => cluster.areaCode || cluster.areaName);
   if (clusterLabels.length > 0) {
     doc.addPage();
@@ -296,15 +435,28 @@ export function buildCsrProgressReportPdf(data: CsrProgressReportData): Uint8Arr
       width: pageWidth - margin * 2,
       barHeight: 12,
       rowGap: 10,
-      title: 'Spend by Cluster',
+      title: showBudgetComparison ? 'Actual Spend by Cluster' : 'Spend by Cluster',
       categories: clusterLabels,
-      series: [
-        {
-          label: 'Amount',
-          color: [245, 158, 11],
-          values: data.clusters.map((cluster) => cluster.amount),
-        },
-      ],
+      series: showBudgetComparison
+        ? [
+            {
+              label: 'Budget',
+              color: [203, 213, 225],
+              values: data.clusterBudgetActuals.map((cluster) => cluster.budgetAmount),
+            },
+            {
+              label: 'Actual',
+              color: [245, 158, 11],
+              values: data.clusters.map((cluster) => cluster.amount),
+            },
+          ]
+        : [
+            {
+              label: 'Amount',
+              color: [245, 158, 11],
+              values: data.clusters.map((cluster) => cluster.amount),
+            },
+          ],
     });
   }
 
@@ -364,6 +516,70 @@ export function buildCsrProgressReportPdf(data: CsrProgressReportData): Uint8Arr
       bodyStyles: { fontSize: 8 },
       margin: { left: margin, right: margin },
     });
+  }
+
+  if (showBudgetComparison && data.clusterBudgetActuals.some((cluster) => cluster.activities.length > 0)) {
+    doc.addPage('a4', 'landscape');
+    const landscapeMargin = 36;
+    let landscapeY = landscapeMargin;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Activity-wise Budget & Actuals Summary', landscapeMargin, landscapeY);
+    landscapeY += 16;
+
+    autoTable(doc, {
+      startY: landscapeY,
+      head: [['Cluster', 'Activity', 'Budget', 'Actual', 'Progress']],
+      body: buildActivityBudgetActualRows(data.clusterBudgetActuals),
+      theme: 'grid',
+      headStyles: { fillColor: [245, 158, 11], textColor: 255, fontSize: 8 },
+      bodyStyles: { fontSize: 7 },
+      margin: { left: landscapeMargin, right: landscapeMargin },
+    });
+
+    const topActivities = [...data.activityBudgetActuals]
+      .filter((activity) => activity.budgetAmount > 0 || activity.actualAmount > 0)
+      .sort((a, b) => b.budgetAmount - a.budgetAmount)
+      .slice(0, 10);
+
+    if (topActivities.length > 0) {
+      doc.addPage();
+      let chartY = margin;
+      chartY = drawGroupedHorizontalBarChart(doc, {
+        x: margin,
+        y: chartY,
+        width: pageWidth - margin * 2,
+        barHeight: 12,
+        rowGap: 10,
+        title: 'Budget vs Actual by Activity (Top 10)',
+        categories: topActivities.map((activity) => activity.activityName),
+        series: [
+          {
+            label: 'Budget',
+            color: [203, 213, 225],
+            values: topActivities.map((activity) => activity.budgetAmount),
+          },
+          {
+            label: 'Actual',
+            color: [245, 158, 11],
+            values: topActivities.map((activity) => activity.actualAmount),
+          },
+        ],
+      });
+
+      chartY = ensureSpace(doc, chartY, 120, margin);
+      drawProgressBarChart(doc, {
+        x: margin,
+        y: chartY,
+        width: pageWidth - margin * 2,
+        rowHeight: 12,
+        rowGap: 10,
+        title: 'Budget Utilisation by Activity (%)',
+        categories: topActivities.map((activity) => activity.activityName),
+        values: topActivities.map((activity) => activity.progressPct),
+      });
+    }
   }
 
   if (data.activityTree.length > 0) {

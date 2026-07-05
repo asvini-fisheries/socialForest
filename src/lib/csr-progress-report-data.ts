@@ -1,6 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import {
+  buildPlannedClusterActivityMap,
+  buildRolledUpBudgetSummariesByArea,
+  getPlannedClusterTotals,
+  sumProjectBudgetAmount,
+  type ActivityBudgetRow,
+} from '@/lib/activity-budget-comparison';
 import { ACTIVITY_SELECT, getServiceClient } from '@/lib/daily-activities-api';
+import { BUDGET_SELECT } from '@/lib/activity-budgets-api';
 import {
   sumActivityAmount,
   sumTreePlantationSpeciesQuantity,
@@ -14,6 +22,23 @@ import {
   type DailyActivityAreaRow,
 } from '@/lib/project-activity-summaries';
 import type { ProjectArea } from '@/types/database';
+
+export type CsrBudgetActualMetrics = {
+  budgetAmount: number;
+  actualAmount: number;
+  progressPct: number;
+};
+
+export type CsrActivityBudgetActual = CsrBudgetActualMetrics & {
+  activityName: string;
+};
+
+export type CsrClusterBudgetActual = CsrBudgetActualMetrics & {
+  areaId: string;
+  areaName: string;
+  areaCode: string | null;
+  activities: CsrActivityBudgetActual[];
+};
 
 export type CsrProgressClusterBlock = {
   areaId: string;
@@ -61,7 +86,10 @@ export type CsrProgressReportData = {
     budgetProgressPct: number;
     totalSaplings: number;
     totalAmount: number;
+    hasActivityBudgets: boolean;
   };
+  clusterBudgetActuals: CsrClusterBudgetActual[];
+  activityBudgetActuals: CsrActivityBudgetActual[];
   clusters: CsrProgressCluster[];
   activityTree: ClusterActivityTree[];
 };
@@ -130,6 +158,87 @@ function filterEntriesByPeriod(
   });
 }
 
+function buildClusterBudgetActuals(
+  areas: ProjectArea[],
+  entries: DailyActivityAreaRow[],
+  budgets: ActivityBudgetRow[]
+): CsrClusterBudgetActual[] {
+  const rolledUpActual = buildRolledUpSummariesByArea(areas, entries);
+  const rolledUpBudget = buildRolledUpBudgetSummariesByArea(areas, budgets);
+  const plannedMap = buildPlannedClusterActivityMap(areas, budgets);
+  const activityTree = buildActivityTreeByCluster(areas, entries);
+
+  return areas
+    .filter((area) => area.level === 1)
+    .sort((a, b) => (a.code || a.name).localeCompare(b.code || b.name, undefined, { numeric: true }))
+    .map((cluster) => {
+      const budgetSummary = rolledUpBudget.get(cluster.id);
+      const actualSummary = rolledUpActual.get(cluster.id);
+      const clusterTree = activityTree.find((tree) => tree.areaId === cluster.id);
+      const clusterPlanned = getPlannedClusterTotals(plannedMap, cluster.id);
+
+      const activityNames = new Set<string>();
+      budgetSummary?.lines.forEach((line) => activityNames.add(line.activityName));
+      clusterTree?.activities.forEach((activity) => activityNames.add(activity.activityName));
+
+      const activities = [...activityNames]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+        .map((activityName) => {
+          const planned =
+            plannedMap.get(`${cluster.id}:${activityName}`) || { quantity: 0, saplings: 0, amount: 0 };
+          const actualActivity = clusterTree?.activities.find(
+            (activity) => activity.activityName === activityName
+          );
+          const budgetAmount = planned.amount;
+          const actualAmount = actualActivity?.amount || 0;
+          return {
+            activityName,
+            budgetAmount,
+            actualAmount,
+            progressPct: pct(actualAmount, budgetAmount),
+          };
+        });
+
+      const budgetAmount = budgetSummary?.totalPlannedAmount || clusterPlanned.amount;
+      const actualAmount = actualSummary?.totalAmount || clusterTree?.amount || 0;
+
+      return {
+        areaId: cluster.id,
+        areaName: cluster.name,
+        areaCode: cluster.code,
+        budgetAmount,
+        actualAmount,
+        progressPct: pct(actualAmount, budgetAmount),
+        activities,
+      };
+    });
+}
+
+function buildProjectActivityBudgetActuals(
+  clusterBudgetActuals: CsrClusterBudgetActual[]
+): CsrActivityBudgetActual[] {
+  const byActivity = new Map<string, { budgetAmount: number; actualAmount: number }>();
+
+  for (const cluster of clusterBudgetActuals) {
+    for (const activity of cluster.activities) {
+      const prev = byActivity.get(activity.activityName) || { budgetAmount: 0, actualAmount: 0 };
+      byActivity.set(activity.activityName, {
+        budgetAmount: prev.budgetAmount + activity.budgetAmount,
+        actualAmount: prev.actualAmount + activity.actualAmount,
+      });
+    }
+  }
+
+  return [...byActivity.entries()]
+    .map(([activityName, values]) => ({
+      activityName,
+      budgetAmount: values.budgetAmount,
+      actualAmount: values.actualAmount,
+      progressPct: pct(values.actualAmount, values.budgetAmount),
+    }))
+    .sort((a, b) => a.activityName.localeCompare(b.activityName, undefined, { numeric: true }));
+}
+
 export function buildCsrProgressReportData(input: {
   project: {
     name: string;
@@ -149,10 +258,12 @@ export function buildCsrProgressReportData(input: {
   };
   areas: ProjectArea[];
   entries: DailyActivityAreaRow[];
+  budgets?: ActivityBudgetRow[];
   periodFrom?: string | null;
   periodTo?: string | null;
 }): CsrProgressReportData {
   const { project, areas } = input;
+  const budgets = input.budgets || [];
   const entries = filterEntriesByPeriod(input.entries, input.periodFrom, input.periodTo);
   const areaById = new Map(areas.map((area) => [area.id, area]));
   const parentById = new Map(areas.map((area) => [area.id, area.parent_area_id]));
@@ -209,6 +320,13 @@ export function buildCsrProgressReportData(input: {
     });
 
   const location = [project.location, project.district, project.state].filter(Boolean).join(', ') || null;
+  const activityBudgetTotal = sumProjectBudgetAmount(budgets);
+  const hasActivityBudgets = activityBudgetTotal > 0;
+  const displayBudgetAmount = hasActivityBudgets
+    ? activityBudgetTotal
+    : Number(project.budget_amount) || 0;
+  const clusterBudgetActuals = buildClusterBudgetActuals(areas, entries, budgets);
+  const activityBudgetActuals = buildProjectActivityBudgetActuals(clusterBudgetActuals);
 
   return {
     projectName: project.name,
@@ -226,12 +344,15 @@ export function buildCsrProgressReportData(input: {
       treesPlanted,
       treeProgressPct: pct(treesPlanted, project.total_trees_planned || 0),
       landAcres: Number(project.total_land_area_acres) || 0,
-      budgetAmount: Number(project.budget_amount) || 0,
+      budgetAmount: displayBudgetAmount,
       budgetActual,
-      budgetProgressPct: pct(budgetActual, Number(project.budget_amount) || 0),
+      budgetProgressPct: pct(budgetActual, displayBudgetAmount),
       totalSaplings,
       totalAmount: budgetActual,
+      hasActivityBudgets,
     },
+    clusterBudgetActuals,
+    activityBudgetActuals,
     clusters,
     activityTree,
   };
@@ -242,7 +363,7 @@ export async function loadCsrProgressReportData(
   options?: { periodFrom?: string | null; periodTo?: string | null }
 ): Promise<CsrProgressReportData> {
   const service = getServiceClient();
-  const [projectRes, areasRes, entriesRes] = await Promise.all([
+  const [projectRes, areasRes, entriesRes, budgetsRes] = await Promise.all([
     service
       .from('projects')
       .select(
@@ -268,6 +389,11 @@ export async function loadCsrProgressReportData(
       .select(ACTIVITY_SELECT)
       .eq('project_id', projectId)
       .order('activity_date', { ascending: false }),
+    service
+      .from('project_area_activity_budgets')
+      .select(BUDGET_SELECT)
+      .eq('project_id', projectId)
+      .eq('is_active', true),
   ]);
 
   if (projectRes.error || !projectRes.data) {
@@ -275,6 +401,7 @@ export async function loadCsrProgressReportData(
   }
   if (areasRes.error) throw new Error(areasRes.error.message);
   if (entriesRes.error) throw new Error(entriesRes.error.message);
+  if (budgetsRes.error) throw new Error(budgetsRes.error.message);
 
   const projectRow = projectRes.data as {
     name: string;
@@ -310,6 +437,7 @@ export async function loadCsrProgressReportData(
     },
     areas: (areasRes.data || []) as ProjectArea[],
     entries: (entriesRes.data || []) as DailyActivityAreaRow[],
+    budgets: (budgetsRes.data || []) as ActivityBudgetRow[],
     periodFrom: options?.periodFrom,
     periodTo: options?.periodTo,
   });
