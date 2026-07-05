@@ -1,25 +1,38 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ExcelExportButton } from '@/components/export/excel-export-button';
 import {
   ActivityBudgetFormDialog,
   type ActivityBudgetEntry,
 } from '@/components/activity-budgets/activity-budget-form-dialog';
 import { useAuth } from '@/contexts/auth-context';
 import { budgetAmount } from '@/lib/activity-budget-metrics';
-import { deleteActivityBudget, fetchActivityBudgets } from '@/lib/activity-budgets-client';
+import {
+  ACTIVITY_BUDGET_EXPORT_COLUMNS,
+  flattenActivityBudgetsForExport,
+} from '@/lib/activity-budget-excel';
+import {
+  deleteActivityBudget,
+  downloadActivityBudgetTemplate,
+  fetchActivityBudgets,
+  importActivityBudgets,
+} from '@/lib/activity-budgets-client';
 import { formatCurrency, formatNumber } from '@/lib/utils';
-import { IndianRupee, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, IndianRupee, Loader2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 
 export default function ActivityBudgetsPage() {
   const { selectedProject } = useAuth();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<ActivityBudgetEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [busy, setBusy] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ActivityBudgetEntry | null>(null);
 
@@ -42,17 +55,56 @@ export default function ActivityBudgetsPage() {
   }, [loadBudgets]);
 
   const totalBudget = useMemo(() => rows.reduce((sum, row) => sum + budgetAmount(row), 0), [rows]);
+  const exportRows = useMemo(() => flattenActivityBudgetsForExport(rows), [rows]);
 
   async function handleDelete(row: ActivityBudgetEntry) {
     if (!selectedProject) return;
     if (!window.confirm('Delete this activity budget?')) return;
     setError('');
+    setSuccess('');
     try {
       await deleteActivityBudget(selectedProject.id, row.id);
       await loadBudgets();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete budget');
     }
+  }
+
+  async function handleTemplateDownload() {
+    if (!selectedProject) return;
+    setBusy('template');
+    setError('');
+    setSuccess('');
+    try {
+      await downloadActivityBudgetTemplate(selectedProject.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Template download failed');
+    }
+    setBusy('');
+  }
+
+  async function handleUpload(file: File) {
+    if (!selectedProject) return;
+    setBusy('upload');
+    setError('');
+    setSuccess('');
+    try {
+      const result = await importActivityBudgets(selectedProject.id, file);
+      if (result.errorCount > 0) {
+        const firstError = result.errors[0];
+        setError(
+          `Imported ${result.successCount} resource line(s) with ${result.errorCount} error(s).` +
+            (firstError ? ` Row ${firstError.row}: ${firstError.message}` : '')
+        );
+      } else {
+        setSuccess(`Successfully imported ${result.successCount} resource line(s).`);
+      }
+      await loadBudgets();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    }
+    setBusy('');
+    if (fileRef.current) fileRef.current.value = '';
   }
 
   if (!selectedProject) {
@@ -73,19 +125,55 @@ export default function ActivityBudgetsPage() {
               Plan budgets by project area and activity with resource line items
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            New Budget
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <ExcelExportButton
+              sheetName="Activity Budgets"
+              filename="activity_budgets.xlsx"
+              columns={ACTIVITY_BUDGET_EXPORT_COLUMNS}
+              rows={exportRows}
+              disabled={loading || exportRows.length === 0}
+            />
+            <Button variant="outline" onClick={handleTemplateDownload} disabled={!!busy}>
+              {busy === 'template' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4" />
+              )}
+              Upload Format
+            </Button>
+            <Button variant="outline" disabled={!!busy} onClick={() => fileRef.current?.click()}>
+              {busy === 'upload' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              Excel Upload
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleUpload(file);
+              }}
+            />
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              New Budget
+            </Button>
+          </div>
         </div>
 
         {error && (
           <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">{error}</div>
+        )}
+        {success && (
+          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm">
+            {success}
+          </div>
         )}
 
         <Card>
@@ -106,7 +194,7 @@ export default function ActivityBudgetsPage() {
               <EmptyState
                 icon={IndianRupee}
                 title="No activity budgets yet"
-                description="Create area-wise and activity-wise budgets with planned resources"
+                description="Create budgets manually, or download the upload format and import from Excel"
               />
             ) : (
               <div className="overflow-x-auto">

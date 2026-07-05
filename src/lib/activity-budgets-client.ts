@@ -2,12 +2,13 @@
 
 import { createClient } from '@/lib/supabase/client';
 
-async function authHeaders(): Promise<HeadersInit> {
+async function authHeaders(options?: { json?: boolean }): Promise<HeadersInit> {
   const supabase = createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {};
+  if (options?.json !== false) headers['Content-Type'] = 'application/json';
   if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
   return headers;
 }
@@ -60,6 +61,47 @@ export async function updateActivityBudget(
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Failed to update budget');
   return json.data;
+}
+
+export async function downloadActivityBudgetTemplate(projectId: string) {
+  const headers = await authHeaders();
+  const res = await fetch(
+    `/api/activity-budgets/template?project_id=${encodeURIComponent(projectId)}`,
+    { headers, credentials: 'include' }
+  );
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || 'Template download failed');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'activity_budgets_upload_format.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function importActivityBudgets(projectId: string, file: File) {
+  const form = new FormData();
+  form.append('project_id', projectId);
+  form.append('file', file);
+
+  const res = await fetch('/api/activity-budgets/import', {
+    method: 'POST',
+    headers: await authHeaders({ json: false }),
+    credentials: 'include',
+    body: form,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || json.errors?.[0]?.message || 'Import failed');
+  return json as {
+    totalRows: number;
+    successCount: number;
+    errorCount: number;
+    errors: { row: number; column: string; value: string; message: string }[];
+    status: string;
+  };
 }
 
 export async function deleteActivityBudget(projectId: string, id: string) {
