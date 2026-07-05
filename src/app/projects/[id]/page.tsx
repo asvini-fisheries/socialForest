@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchDailyActivities } from '@/lib/daily-activities-client';
+import { fetchActivityBudgets } from '@/lib/activity-budgets-client';
+import { sumProjectBudgetAmount, type ActivityBudgetRow } from '@/lib/activity-budget-comparison';
 import { sumActivityAmount, sumTreePlantationSpeciesQuantity } from '@/lib/daily-activity-metrics';
 import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
 
@@ -39,6 +41,7 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [areas, setAreas] = useState<ProjectArea[]>([]);
   const [activityEntries, setActivityEntries] = useState<DailyActivityAreaRow[]>([]);
+  const [budgetEntries, setBudgetEntries] = useState<ActivityBudgetRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activityError, setActivityError] = useState('');
@@ -73,8 +76,12 @@ export default function ProjectDetailPage() {
     }
 
     let activityRows: DailyActivityAreaRow[] = [];
+    let budgetRows: ActivityBudgetRow[] = [];
     try {
-      activityRows = (await fetchDailyActivities(id)) as DailyActivityAreaRow[];
+      [activityRows, budgetRows] = await Promise.all([
+        fetchDailyActivities(id) as Promise<DailyActivityAreaRow[]>,
+        fetchActivityBudgets(id) as Promise<ActivityBudgetRow[]>,
+      ]);
     } catch (err) {
       setActivityError(err instanceof Error ? err.message : 'Failed to load activities');
     }
@@ -82,6 +89,7 @@ export default function ProjectDetailPage() {
     setProject(projectRes.data as Project);
     setAreas((areasRes.data as ProjectArea[]) || []);
     setActivityEntries(activityRows);
+    setBudgetEntries(budgetRows);
     setLoading(false);
   }, [id]);
 
@@ -95,6 +103,8 @@ export default function ProjectDetailPage() {
     [activityEntries]
   );
   const budgetActual = useMemo(() => sumActivityAmount(activityEntries), [activityEntries]);
+  const budgetPlanned = useMemo(() => sumProjectBudgetAmount(budgetEntries), [budgetEntries]);
+  const displayBudgetPlanned = budgetPlanned > 0 ? budgetPlanned : project?.budget_amount || 0;
 
   useEffect(() => {
     loadProject();
@@ -186,7 +196,7 @@ export default function ProjectDetailPage() {
                 {
                   label: 'Amount',
                   lines: [
-                    { caption: 'Budget', value: formatCurrency(project.budget_amount) },
+                    { caption: 'Planned', value: formatCurrency(displayBudgetPlanned) },
                     { caption: 'Actual', value: formatCurrency(budgetActual) },
                   ],
                   icon: IndianRupee,
@@ -254,6 +264,7 @@ export default function ProjectDetailPage() {
                 <ProjectAreaActivitySummaryTable
                   areas={areas}
                   entries={activityEntries}
+                  budgets={budgetEntries}
                   projectName={project.name}
                   organisationName={project.organisation?.name}
                 />

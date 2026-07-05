@@ -23,6 +23,9 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchDailyActivities } from '@/lib/daily-activities-client';
+import { fetchActivityBudgets } from '@/lib/activity-budgets-client';
+import { sumProjectBudgetAmount, type ActivityBudgetRow } from '@/lib/activity-budget-comparison';
+import { sumActivityAmount } from '@/lib/daily-activity-metrics';
 import { createClient } from '@/lib/supabase/client';
 import type { ProjectArea } from '@/types/database';
 
@@ -30,17 +33,19 @@ export default function DashboardPage() {
   const { user, selectedProject } = useAuth();
   const [areas, setAreas] = useState<ProjectArea[]>([]);
   const [activityEntries, setActivityEntries] = useState<DailyActivityAreaRow[]>([]);
+  const [budgetEntries, setBudgetEntries] = useState<ActivityBudgetRow[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
 
   const loadActivityData = useCallback(async () => {
     if (!selectedProject?.id) {
       setAreas([]);
       setActivityEntries([]);
+      setBudgetEntries([]);
       return;
     }
     setLoadingActivities(true);
     const supabase = createClient();
-    const [areasRes, activityRows] = await Promise.all([
+    const [areasRes, activityRows, budgetRows] = await Promise.all([
       supabase
         .from('project_areas')
         .select('*')
@@ -49,10 +54,12 @@ export default function DashboardPage() {
         .order('level')
         .order('name'),
       fetchDailyActivities(selectedProject.id).catch(() => []),
+      fetchActivityBudgets(selectedProject.id).catch(() => []),
     ]);
 
     setAreas((areasRes.data as ProjectArea[]) || []);
     setActivityEntries(activityRows as DailyActivityAreaRow[]);
+    setBudgetEntries(budgetRows as ActivityBudgetRow[]);
     setLoadingActivities(false);
   }, [selectedProject?.id]);
 
@@ -64,6 +71,10 @@ export default function DashboardPage() {
     () => buildRolledUpSummariesByArea(areas, activityEntries),
     [areas, activityEntries]
   );
+
+  const budgetPlanned = useMemo(() => sumProjectBudgetAmount(budgetEntries), [budgetEntries]);
+  const budgetActual = useMemo(() => sumActivityAmount(activityEntries), [activityEntries]);
+  const displayBudgetPlanned = budgetPlanned > 0 ? budgetPlanned : selectedProject?.budget_amount || 0;
 
   const stats = [
     {
@@ -80,7 +91,8 @@ export default function DashboardPage() {
     },
     {
       label: 'Budget',
-      value: formatCurrency(selectedProject?.budget_amount || 0),
+      value: formatCurrency(displayBudgetPlanned),
+      subValue: `Actual: ${formatCurrency(budgetActual)}`,
       icon: IndianRupee,
       color: 'text-amber-600 bg-amber-50',
     },
@@ -120,6 +132,9 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm text-gray-500">{stat.label}</p>
                     <p className="text-xl font-bold text-gray-900">{stat.value}</p>
+                    {'subValue' in stat && stat.subValue && (
+                      <p className="text-xs text-gray-500 mt-1">{stat.subValue}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -162,7 +177,11 @@ export default function DashboardPage() {
                     Loading summaries...
                   </div>
                 ) : (
-                  <ProjectAreaActivitySummaryTable areas={areas} entries={activityEntries} />
+                  <ProjectAreaActivitySummaryTable
+                    areas={areas}
+                    entries={activityEntries}
+                    budgets={budgetEntries}
+                  />
                 )}
               </CardContent>
             </Card>

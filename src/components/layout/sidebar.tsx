@@ -56,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
   { label: 'Projects', href: '/projects', icon: FolderKanban, module: 'projects' },
   { label: 'Daily Activities', href: '/daily-activities', icon: Activity, module: 'daily_activities' },
+  { label: 'Activity Budgets', href: '/activity-budgets', icon: IndianRupee, module: 'activity_budgets' },
   { label: 'Attendance', href: '/attendance', icon: ClipboardList, module: 'attendance' },
   { label: 'Attendance Details', href: '/attendance/details', icon: ClipboardList, module: 'attendance' },
   { label: 'Bills', href: '/bills', icon: Receipt, module: 'bills' },

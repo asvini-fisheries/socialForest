@@ -11,12 +11,18 @@ import {
   type ClusterActivityTree,
   type DailyActivityAreaRow,
 } from '@/lib/project-activity-summaries';
+import {
+  buildPlannedClusterActivityMap,
+  getPlannedClusterTotals,
+  type ActivityBudgetRow,
+} from '@/lib/activity-budget-comparison';
 import { flattenActivityTreeForExport } from '@/lib/project-activity-report-pdf';
 import type { ProjectArea } from '@/types/database';
 
 interface ProjectAreaActivitySummaryProps {
   areas: ProjectArea[];
   entries: DailyActivityAreaRow[];
+  budgets?: ActivityBudgetRow[];
   projectName?: string;
   organisationName?: string;
 }
@@ -115,12 +121,16 @@ function ActivityNode({
   depth,
   expandedKeys,
   onToggle,
+  showBudgetComparison,
+  plannedAmount,
 }: {
   clusterId: string;
   activity: ClusterActivityTree['activities'][0];
   depth: number;
   expandedKeys: Set<string>;
   onToggle: (key: string) => void;
+  showBudgetComparison: boolean;
+  plannedAmount: number;
 }) {
   const key = `activity:${clusterId}:${activity.activityName}`;
   const expanded = expandedKeys.has(key);
@@ -146,6 +156,11 @@ function ActivityNode({
           <span className="min-w-[4rem] text-right">
             {activity.saplings ? formatNumber(activity.saplings) : '—'}
           </span>
+          {showBudgetComparison && (
+            <span className="min-w-[5.5rem] text-right text-amber-700">
+              {plannedAmount ? formatCurrency(plannedAmount) : '—'}
+            </span>
+          )}
           <span className="min-w-[5.5rem] text-right">{formatCurrency(activity.amount)}</span>
         </div>
       </div>
@@ -158,15 +173,20 @@ function ClusterNode({
   cluster,
   expandedKeys,
   onToggle,
+  showBudgetComparison,
+  plannedMap,
 }: {
   cluster: ClusterActivityTree;
   expandedKeys: Set<string>;
   onToggle: (key: string) => void;
+  showBudgetComparison: boolean;
+  plannedMap: Map<string, { quantity: number; saplings: number; amount: number }>;
 }) {
   const clusterId = cluster.areaId ?? 'whole';
   const key = `cluster:${clusterId}`;
   const expanded = expandedKeys.has(key);
   const hasActivities = cluster.activities.length > 0;
+  const clusterPlanned = getPlannedClusterTotals(plannedMap, cluster.areaId);
 
   return (
     <div className="rounded-lg border border-gray-200 overflow-hidden">
@@ -191,18 +211,33 @@ function ClusterNode({
           <span className="min-w-[4rem] text-right">
             {cluster.saplings ? formatNumber(cluster.saplings) : '—'}
           </span>
+          {showBudgetComparison && (
+            <span className="min-w-[5.5rem] text-right text-amber-700">
+              {clusterPlanned.amount ? formatCurrency(clusterPlanned.amount) : '—'}
+            </span>
+          )}
           <span className="min-w-[5.5rem] text-right">{formatCurrency(cluster.amount)}</span>
         </div>
       </div>
       {expanded && hasActivities && (
         <div className="p-2 space-y-1 bg-white">
-          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1 text-xs font-medium text-gray-400">
+          <div
+            className={`grid gap-2 px-3 py-1 text-xs font-medium text-gray-400 ${
+              showBudgetComparison
+                ? 'grid-cols-[1fr_auto_auto_auto_auto]'
+                : 'grid-cols-[1fr_auto_auto_auto]'
+            }`}
+          >
             <span>Activity</span>
             <span className="text-right">Quantity</span>
             <span className="text-right">Saplings</span>
-            <span className="text-right">Amount</span>
+            {showBudgetComparison && <span className="text-right">Planned</span>}
+            <span className="text-right">Actual</span>
           </div>
-          {cluster.activities.map((activity) => (
+          {cluster.activities.map((activity) => {
+            const plannedKey = `${cluster.areaId ?? 'whole'}:${activity.activityName}`;
+            const planned = plannedMap.get(plannedKey);
+            return (
             <ActivityNode
               key={activity.activityName}
               clusterId={clusterId}
@@ -210,8 +245,11 @@ function ClusterNode({
               depth={1}
               expandedKeys={expandedKeys}
               onToggle={onToggle}
+              showBudgetComparison={showBudgetComparison}
+              plannedAmount={planned?.amount || 0}
             />
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -221,10 +259,16 @@ function ClusterNode({
 export function ProjectAreaActivitySummaryTable({
   areas,
   entries,
+  budgets = [],
   projectName,
   organisationName,
 }: ProjectAreaActivitySummaryProps) {
   const tree = useMemo(() => buildActivityTreeByCluster(areas, entries), [areas, entries]);
+  const plannedMap = useMemo(
+    () => buildPlannedClusterActivityMap(areas, budgets),
+    [areas, budgets]
+  );
+  const showBudgetComparison = budgets.length > 0;
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -250,6 +294,7 @@ export function ProjectAreaActivitySummaryTable({
   const grandQuantity = tree.reduce((sum, c) => sum + c.quantity, 0);
   const grandSaplings = tree.reduce((sum, c) => sum + c.saplings, 0);
   const grandAmount = tree.reduce((sum, c) => sum + c.amount, 0);
+  const totalPlanned = [...plannedMap.values()].reduce((sum, values) => sum + values.amount, 0);
 
   async function downloadPdf() {
     setPdfLoading(true);
@@ -289,11 +334,18 @@ export function ProjectAreaActivitySummaryTable({
         </Button>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-200">
+      <div
+        className={`grid gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-200 ${
+          showBudgetComparison
+            ? 'grid-cols-[1fr_auto_auto_auto_auto]'
+            : 'grid-cols-[1fr_auto_auto_auto]'
+        }`}
+      >
         <span>Cluster / Project Area</span>
         <span className="text-right">Quantity</span>
         <span className="text-right">Saplings</span>
-        <span className="text-right">Amount</span>
+        {showBudgetComparison && <span className="text-right">Planned</span>}
+        <span className="text-right">Actual</span>
       </div>
 
       {tree.map((cluster) => (
@@ -302,15 +354,28 @@ export function ProjectAreaActivitySummaryTable({
           cluster={cluster}
           expandedKeys={expandedKeys}
           onToggle={toggle}
+          showBudgetComparison={showBudgetComparison}
+          plannedMap={plannedMap}
         />
       ))}
 
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-3 rounded-lg bg-gray-50 font-semibold text-sm text-gray-900 border-t-2 border-gray-200">
+      <div
+        className={`grid gap-2 px-3 py-3 rounded-lg bg-gray-50 font-semibold text-sm text-gray-900 border-t-2 border-gray-200 ${
+          showBudgetComparison
+            ? 'grid-cols-[1fr_auto_auto_auto_auto]'
+            : 'grid-cols-[1fr_auto_auto_auto]'
+        }`}
+      >
         <span>Grand total</span>
         <span className="text-right tabular-nums">{formatNumber(grandQuantity)}</span>
         <span className="text-right tabular-nums min-w-[4rem]">
           {grandSaplings ? formatNumber(grandSaplings) : '—'}
         </span>
+        {showBudgetComparison && (
+          <span className="text-right tabular-nums min-w-[5.5rem] text-amber-700">
+            {totalPlanned ? formatCurrency(totalPlanned) : '—'}
+          </span>
+        )}
         <span className="text-right tabular-nums min-w-[5.5rem]">{formatCurrency(grandAmount)}</span>
       </div>
     </div>

@@ -26,7 +26,7 @@ const REPORT_SECTIONS = [
     title: 'Financial Reports',
     items: [
       { label: 'Stakeholder Bills', href: '/bills', icon: FileText, desc: 'Bills by period' },
-      { label: 'Contractor Invoices', href: '/invoices', icon: FileText, desc: 'Invoices to CSR' },
+      { label: 'Activity Budgets', href: '/activity-budgets', icon: IndianRupee, desc: 'Area and activity-wise planned budgets with resources' },
       { label: 'Payments', href: '/payments', icon: IndianRupee, desc: 'Payment history' },
       { label: 'Expenses', href: '/expenses', icon: IndianRupee, desc: 'Contractor expense report' },
     ],

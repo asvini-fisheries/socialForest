@@ -254,7 +254,7 @@ export const MODULE_ACCESS: Record<UserRole, string[]> = {
   admin: ['*'],
   csr_partner: ['dashboard', 'projects', 'reports', 'esg'],
   organisation: [
-    'dashboard', 'projects', 'daily_activities', 'attendance', 'bills',
+    'dashboard', 'projects', 'daily_activities', 'activity_budgets', 'attendance', 'bills',
     'payments', 'invoices', 'expenses', 'nursery', 'census', 'reports',
   ],
   stakeholder: [
