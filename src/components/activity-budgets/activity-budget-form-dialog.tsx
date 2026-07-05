@@ -8,26 +8,13 @@ import { Select } from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/auth-context';
 import { budgetAmount } from '@/lib/activity-budget-metrics';
+import type { ActivityBudgetListRow } from '@/lib/activity-budget-display';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 
 type ResourceRow = { resource_id: string; planned_quantity: string; unit_rate: string };
 
-export type ActivityBudgetEntry = {
-  id: string;
-  project_area_id: string | null;
-  activity_id: string;
-  planned_quantity: number | null;
-  remarks: string | null;
-  activity?: { id?: string; name?: string } | null;
-  project_area?: { name?: string } | null;
-  resources?: {
-    resource_id: string;
-    planned_quantity: number;
-    unit_rate: number | null;
-    resource?: { name?: string } | null;
-  }[];
-};
+export type ActivityBudgetEntry = ActivityBudgetListRow;
 
 interface ActivityBudgetFormDialogProps {
   open: boolean;
