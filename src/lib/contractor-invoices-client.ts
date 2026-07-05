@@ -91,3 +91,26 @@ export async function createContractorInvoice(payload: {
   if (!res.ok) throw new Error(json.error || 'Failed to create invoice');
   return json.data;
 }
+
+export async function downloadContractorInvoicePdf(
+  projectId: string,
+  invoiceId: string,
+  filename: string
+) {
+  const headers = await authHeaders();
+  const res = await fetch(
+    `/api/contractor-invoices/${invoiceId}/pdf?project_id=${encodeURIComponent(projectId)}`,
+    { headers, credentials: 'include' }
+  );
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || 'PDF download failed');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

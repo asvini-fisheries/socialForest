@@ -5,13 +5,54 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchContractorInvoice } from '@/lib/contractor-invoices-client';
+import {
+  downloadContractorInvoicePdf,
+  fetchContractorInvoice,
+} from '@/lib/contractor-invoices-client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import type { InvoiceStatus } from '@/types/database';
-import { ArrowLeft, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, FileText, ImageIcon, Loader2 } from 'lucide-react';
+
+type ActivityImage = {
+  id: string;
+  image_url: string;
+  caption?: string | null;
+};
+
+type BillItem = {
+  id: string;
+  description: string | null;
+  daily_activity_id: string | null;
+  daily_activity?: {
+    id: string;
+    activity_date: string;
+    images?: ActivityImage[] | null;
+  } | null;
+};
+
+type StakeholderBill = {
+  id: string;
+  bill_number: string | null;
+  items?: BillItem[] | null;
+};
+
+type ExpenseAttachment = {
+  id: string;
+  file_url: string;
+  file_name: string | null;
+};
+
+type ContractorExpense = {
+  id: string;
+  expense_date: string;
+  category: string | null;
+  description: string | null;
+  attachments?: ExpenseAttachment[] | null;
+};
 
 type InvoiceItem = {
   id: string;
@@ -20,6 +61,8 @@ type InvoiceItem = {
   contractor_expense_id: string | null;
   description: string | null;
   amount: number;
+  stakeholder_bill?: StakeholderBill | null;
+  contractor_expense?: ContractorExpense | null;
 };
 
 type InvoiceDetail = {
@@ -37,6 +80,20 @@ type InvoiceDetail = {
   items?: InvoiceItem[];
 };
 
+function collectActivityImages(bill?: StakeholderBill | null): ActivityImage[] {
+  if (!bill?.items?.length) return [];
+  const seen = new Set<string>();
+  const images: ActivityImage[] = [];
+  for (const item of bill.items) {
+    for (const image of item.daily_activity?.images || []) {
+      if (seen.has(image.id)) continue;
+      seen.add(image.id);
+      images.push(image);
+    }
+  }
+  return images;
+}
+
 export default function InvoiceDetailPage() {
   const params = useParams();
   const id = String(params.id);
@@ -44,6 +101,7 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const loadInvoice = useCallback(async () => {
     if (!selectedProject) return;
@@ -63,6 +121,22 @@ export default function InvoiceDetailPage() {
     loadInvoice();
   }, [loadInvoice]);
 
+  async function handleDownloadPdf() {
+    if (!selectedProject || !invoice) return;
+    setPdfLoading(true);
+    setError('');
+    try {
+      await downloadContractorInvoicePdf(
+        selectedProject.id,
+        invoice.id,
+        `${invoice.invoice_number || 'contractor-invoice'}.pdf`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'PDF download failed');
+    }
+    setPdfLoading(false);
+  }
+
   if (!selectedProject) {
     return (
       <DashboardLayout>
@@ -74,12 +148,20 @@ export default function InvoiceDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl">
-        <div>
-          <Link href="/invoices" className="inline-flex items-center gap-1 text-sm text-emerald-600 mb-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Invoices
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Invoice Details</h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <Link href="/invoices" className="inline-flex items-center gap-1 text-sm text-emerald-600 mb-2">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Invoices
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-900">Invoice Details</h1>
+          </div>
+          {invoice && (
+            <Button variant="outline" onClick={handleDownloadPdf} disabled={pdfLoading}>
+              {pdfLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Download PDF
+            </Button>
+          )}
         </div>
 
         {error && (
@@ -143,29 +225,33 @@ export default function InvoiceDetailPage() {
               <CardHeader>
                 <CardTitle>Invoice Lines</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 font-medium text-gray-500">Source</th>
-                        <th className="text-left py-3 px-4 font-medium text-gray-500">Description</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-500">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(invoice.items || []).map((item) => (
-                        <tr key={item.id} className="border-b border-gray-100">
-                          <td className="py-3 px-4 text-gray-700">
+              <CardContent className="space-y-6">
+                {(invoice.items || []).map((item) => {
+                  const activityImages =
+                    item.source_type === 'activity_bill'
+                      ? collectActivityImages(item.stakeholder_bill)
+                      : [];
+                  const expenseAttachments =
+                    item.source_type === 'expense'
+                      ? item.contractor_expense?.attachments || []
+                      : [];
+
+                  return (
+                    <div key={item.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
                             {item.source_type === 'activity_bill' ? 'Activity Bill' : 'Expense'}
-                          </td>
-                          <td className="py-3 px-4 text-gray-700">
+                          </p>
+                          <p className="font-medium text-gray-900 mt-1">
                             {item.stakeholder_bill_id && (
                               <Link
                                 href={`/bills/${item.stakeholder_bill_id}`}
                                 className="text-emerald-600 hover:underline"
                               >
-                                {item.description || 'View bill'}
+                                {item.description ||
+                                  item.stakeholder_bill?.bill_number ||
+                                  'View activity bill'}
                               </Link>
                             )}
                             {item.contractor_expense_id && (
@@ -173,21 +259,67 @@ export default function InvoiceDetailPage() {
                                 href={`/expenses/${item.contractor_expense_id}`}
                                 className="text-emerald-600 hover:underline"
                               >
-                                {item.description || 'View expense'}
+                                {item.description ||
+                                  item.contractor_expense?.description ||
+                                  'View expense'}
                               </Link>
                             )}
                             {!item.stakeholder_bill_id && !item.contractor_expense_id && (
                               item.description || '—'
                             )}
-                          </td>
-                          <td className="py-3 px-4 text-right tabular-nums font-medium">
-                            {formatCurrency(item.amount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </p>
+                        </div>
+                        <p className="font-semibold tabular-nums">{formatCurrency(item.amount)}</p>
+                      </div>
+
+                      {activityImages.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                            <ImageIcon className="w-4 h-4 text-emerald-600" />
+                            Activity images
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {activityImages.map((image, index) => (
+                              <a
+                                key={image.id}
+                                href={image.image_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-sm text-emerald-600 hover:underline"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                {image.caption?.trim() || `Image ${index + 1}`}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {expenseAttachments.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                            <FileText className="w-4 h-4 text-emerald-600" />
+                            Expense attachments
+                          </p>
+                          <div className="space-y-1">
+                            {expenseAttachments.map((file) => (
+                              <a
+                                key={file.id}
+                                href={file.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-sm text-emerald-600 hover:underline"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                {file.file_name || 'View attachment'}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           </>

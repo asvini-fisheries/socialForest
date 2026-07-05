@@ -6,10 +6,13 @@ import { DashboardLayout } from '@/components/layout/sidebar';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/contexts/auth-context';
-import { fetchContractorInvoices } from '@/lib/contractor-invoices-client';
+import {
+  downloadContractorInvoicePdf,
+  fetchContractorInvoices,
+} from '@/lib/contractor-invoices-client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import type { InvoiceStatus } from '@/types/database';
-import { FileText, Loader2, Plus } from 'lucide-react';
+import { Download, Eye, FileText, Loader2, Plus } from 'lucide-react';
 
 type InvoiceRow = {
   id: string;
@@ -26,6 +29,7 @@ export default function InvoicesPage() {
   const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
 
   const loadInvoices = useCallback(async () => {
     if (!selectedProject) return;
@@ -44,6 +48,22 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices();
   }, [loadInvoices]);
+
+  async function handleDownloadPdf(row: InvoiceRow) {
+    if (!selectedProject) return;
+    setPdfLoadingId(row.id);
+    setError('');
+    try {
+      await downloadContractorInvoicePdf(
+        selectedProject.id,
+        row.id,
+        `${row.invoice_number || 'contractor-invoice'}.pdf`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'PDF download failed');
+    }
+    setPdfLoadingId(null);
+  }
 
   if (!selectedProject) {
     return (
@@ -108,16 +128,13 @@ export default function InvoicesPage() {
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Date</th>
                       <th className="text-right py-3 px-4 font-medium text-gray-500">Amount</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-500">Status</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-500">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <Link href={`/invoices/${row.id}`} className="text-emerald-600 hover:underline font-medium">
-                            {row.invoice_number || '—'}
-                          </Link>
-                        </td>
+                        <td className="py-3 px-4 font-medium">{row.invoice_number || '—'}</td>
                         <td className="py-3 px-4 text-gray-700">{row.stakeholder?.name || '—'}</td>
                         <td className="py-3 px-4 text-gray-700">{formatDate(row.invoice_date)}</td>
                         <td className="py-3 px-4 text-right tabular-nums font-medium">
@@ -125,6 +142,30 @@ export default function InvoicesPage() {
                         </td>
                         <td className="py-3 px-4">
                           <StatusBadge status={row.status} />
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="inline-flex items-center justify-end gap-3">
+                            <Link
+                              href={`/invoices/${row.id}`}
+                              className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-medium"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              View
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPdf(row)}
+                              disabled={pdfLoadingId === row.id}
+                              className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                            >
+                              {pdfLoadingId === row.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
+                              PDF
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
