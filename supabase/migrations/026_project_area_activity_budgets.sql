@@ -29,8 +29,7 @@ CREATE TABLE project_area_activity_budget_items (
   resource_id UUID NOT NULL REFERENCES resources_materials(id),
   planned_quantity DECIMAL(12,2) NOT NULL,
   unit_rate DECIMAL(12,2) NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (budget_id, resource_id)
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_project_area_activity_budget_items_budget

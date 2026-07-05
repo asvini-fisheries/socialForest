@@ -163,17 +163,11 @@ export async function importActivityBudgetRows(
     if (plannedQuantity != null) group.planned_quantity = plannedQuantity;
     if (remarks) group.remarks = remarks;
 
-    const duplicate = group.resources.find((item) => item.resource_id === resourceId);
-    if (duplicate) {
-      duplicate.planned_quantity += resourceQty;
-      duplicate.unit_rate = unitRate;
-    } else {
-      group.resources.push({
-        resource_id: resourceId,
-        planned_quantity: resourceQty,
-        unit_rate: unitRate,
-      });
-    }
+    group.resources.push({
+      resource_id: resourceId,
+      planned_quantity: resourceQty,
+      unit_rate: unitRate,
+    });
   });
 
   if (errors.length) {
