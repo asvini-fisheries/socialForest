@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { buildProjectAreaTree } from '@/lib/project-areas-tree';
+import { ClusterBlockMatrix } from '@/components/projects/cluster-block-matrix';
 import type { AreaActivitySummary } from '@/lib/project-activity-summaries';
 import type { ProjectArea } from '@/types/database';
 
@@ -104,6 +105,7 @@ function AreaNode({
   const expanded = expandedIds.has(area.id);
   const children = area.children ?? [];
   const summary = activitySummaries?.get(area.id);
+  const isCluster = area.level === 1;
   const hasChildren = children.length > 0;
   const hasActivities = (summary?.lines.length ?? 0) > 0;
   const hasExpandable = hasChildren || hasActivities;
@@ -117,7 +119,8 @@ function AreaNode({
         hasExpandable={hasExpandable}
       />
       {expanded && summary && <ActivitySummaryLines summary={summary} />}
-      {expanded && hasChildren && (
+      {expanded && isCluster && hasChildren && <ClusterBlockMatrix cluster={area} />}
+      {expanded && !isCluster && hasChildren && (
         <div className="mt-2 space-y-2">
           {children.map((child) => (
             <AreaNode
