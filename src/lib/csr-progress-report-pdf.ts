@@ -1,12 +1,141 @@
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { type RowInput } from 'jspdf-autotable';
 import type { CsrProgressReportData } from '@/lib/csr-progress-report-data';
 import { drawGroupedHorizontalBarChart, drawProgressBarChart } from '@/lib/pdf-charts';
-import { formatActivityResourcesLabel } from '@/lib/project-activity-summaries';
+import {
+  formatActivityResourcesLabel,
+  type ClusterActivityTree,
+} from '@/lib/project-activity-summaries';
 import { formatDate } from '@/lib/utils';
 
 function pdfCurrency(amount: number): string {
   return `Rs. ${Math.round(amount).toLocaleString('en-IN')}`;
+}
+
+function formatPdfNumber(value: number): string {
+  return value ? value.toLocaleString('en-IN') : '0';
+}
+
+const activitySubtotalFill: [number, number, number] = [236, 253, 245];
+const clusterSubtotalFill: [number, number, number] = [209, 250, 229];
+
+function buildActivityDetailRows(tree: ClusterActivityTree[]): RowInput[] {
+  const rows: RowInput[] = [];
+
+  for (const cluster of tree) {
+    for (const activity of cluster.activities) {
+      if (activity.details.length) {
+        for (const line of activity.details) {
+          rows.push([
+            cluster.areaName,
+            activity.activityName,
+            line.date ? formatDate(line.date) : '—',
+            line.projectAreaName || '—',
+            line.stakeholderName || '—',
+            formatActivityResourcesLabel(line.resources) || '—',
+            formatPdfNumber(line.quantity || 0),
+            formatPdfNumber(line.saplings || 0),
+            pdfCurrency(line.amount || 0),
+          ]);
+        }
+
+        if (activity.details.length > 1) {
+          rows.push([
+            '',
+            {
+              content: `Subtotal — ${activity.activityName}`,
+              colSpan: 5,
+              styles: {
+                fillColor: activitySubtotalFill,
+                fontStyle: 'bold',
+                textColor: 30,
+              },
+            },
+            {
+              content: formatPdfNumber(activity.quantity),
+              styles: {
+                fillColor: activitySubtotalFill,
+                fontStyle: 'bold',
+                halign: 'right',
+                textColor: 30,
+              },
+            },
+            {
+              content: formatPdfNumber(activity.saplings),
+              styles: {
+                fillColor: activitySubtotalFill,
+                fontStyle: 'bold',
+                halign: 'right',
+                textColor: 30,
+              },
+            },
+            {
+              content: pdfCurrency(activity.amount),
+              styles: {
+                fillColor: activitySubtotalFill,
+                fontStyle: 'bold',
+                halign: 'right',
+                textColor: 30,
+              },
+            },
+          ]);
+        }
+      } else {
+        rows.push([
+          cluster.areaName,
+          activity.activityName,
+          '—',
+          '—',
+          '—',
+          '—',
+          formatPdfNumber(activity.quantity),
+          formatPdfNumber(activity.saplings),
+          pdfCurrency(activity.amount),
+        ]);
+      }
+    }
+
+    rows.push([
+      {
+        content: `Subtotal — ${cluster.areaName}`,
+        colSpan: 6,
+        styles: {
+          fillColor: clusterSubtotalFill,
+          fontStyle: 'bold',
+          textColor: 20,
+        },
+      },
+      {
+        content: formatPdfNumber(cluster.quantity),
+        styles: {
+          fillColor: clusterSubtotalFill,
+          fontStyle: 'bold',
+          halign: 'right',
+          textColor: 20,
+        },
+      },
+      {
+        content: formatPdfNumber(cluster.saplings),
+        styles: {
+          fillColor: clusterSubtotalFill,
+          fontStyle: 'bold',
+          halign: 'right',
+          textColor: 20,
+        },
+      },
+      {
+        content: pdfCurrency(cluster.amount),
+        styles: {
+          fillColor: clusterSubtotalFill,
+          fontStyle: 'bold',
+          halign: 'right',
+          textColor: 20,
+        },
+      },
+    ]);
+  }
+
+  return rows;
 }
 
 function formatStatus(status: string): string {
@@ -247,38 +376,7 @@ export function buildCsrProgressReportPdf(data: CsrProgressReportData): Uint8Arr
     doc.text('Cluster-wise Activity Details', landscapeMargin, landscapeY);
     landscapeY += 16;
 
-    const detailBody: string[][] = [];
-    for (const cluster of data.activityTree) {
-      for (const activity of cluster.activities) {
-        if (activity.details.length) {
-          for (const line of activity.details) {
-            detailBody.push([
-              cluster.areaName,
-              activity.activityName,
-              line.date ? formatDate(line.date) : '—',
-              line.projectAreaName || '—',
-              line.stakeholderName || '—',
-              formatActivityResourcesLabel(line.resources) || '—',
-              String(line.quantity || 0),
-              String(line.saplings || 0),
-              pdfCurrency(line.amount || 0),
-            ]);
-          }
-        } else {
-          detailBody.push([
-            cluster.areaName,
-            activity.activityName,
-            '—',
-            '—',
-            '—',
-            '—',
-            String(activity.quantity),
-            String(activity.saplings),
-            pdfCurrency(activity.amount),
-          ]);
-        }
-      }
-    }
+    const detailBody = buildActivityDetailRows(data.activityTree);
 
     autoTable(doc, {
       startY: landscapeY,
