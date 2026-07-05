@@ -58,16 +58,3 @@ export function sumActivityQuantity(entries: DailyActivityMetricRow[]): number {
 export function sumActivityAmount(entries: DailyActivityMetricRow[]): number {
   return entries.reduce((sum, entry) => sum + entryAmount(entry), 0);
 }
-
-/** Tree-species resource totals keyed by project_area_id */
-export function buildSaplingsByAreaId(
-  entries: (DailyActivityMetricRow & { project_area_id?: string | null })[]
-): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const entry of entries) {
-    if (!entry.project_area_id) continue;
-    const prev = map.get(entry.project_area_id) || 0;
-    map.set(entry.project_area_id, prev + treeSpeciesQuantity(entry));
-  }
-  return map;
-}

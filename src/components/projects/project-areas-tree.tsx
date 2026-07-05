@@ -4,14 +4,12 @@ import { useMemo, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { buildProjectAreaTree } from '@/lib/project-areas-tree';
-import { ClusterBlockMatrix } from '@/components/projects/cluster-block-matrix';
 import type { AreaActivitySummary } from '@/lib/project-activity-summaries';
 import type { ProjectArea } from '@/types/database';
 
 interface ProjectAreasTreeProps {
   areas: ProjectArea[];
   activitySummaries?: Map<string, AreaActivitySummary>;
-  saplingsByAreaId?: Map<string, number>;
 }
 
 function ActivitySummaryLines({ summary }: { summary: AreaActivitySummary }) {
@@ -96,19 +94,16 @@ function AreaNode({
   expandedIds,
   onToggle,
   activitySummaries,
-  saplingsByAreaId,
 }: {
   area: ProjectArea;
   depth: number;
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
   activitySummaries?: Map<string, AreaActivitySummary>;
-  saplingsByAreaId?: Map<string, number>;
 }) {
   const expanded = expandedIds.has(area.id);
   const children = area.children ?? [];
   const summary = activitySummaries?.get(area.id);
-  const isCluster = area.level === 1;
   const hasChildren = children.length > 0;
   const hasActivities = (summary?.lines.length ?? 0) > 0;
   const hasExpandable = hasChildren || hasActivities;
@@ -122,10 +117,7 @@ function AreaNode({
         hasExpandable={hasExpandable}
       />
       {expanded && summary && <ActivitySummaryLines summary={summary} />}
-      {expanded && isCluster && hasChildren && (
-        <ClusterBlockMatrix cluster={area} saplingsByAreaId={saplingsByAreaId} />
-      )}
-      {expanded && !isCluster && hasChildren && (
+      {expanded && hasChildren && (
         <div className="mt-2 space-y-2">
           {children.map((child) => (
             <AreaNode
@@ -135,7 +127,6 @@ function AreaNode({
               expandedIds={expandedIds}
               onToggle={onToggle}
               activitySummaries={activitySummaries}
-              saplingsByAreaId={saplingsByAreaId}
             />
           ))}
         </div>
@@ -144,7 +135,7 @@ function AreaNode({
   );
 }
 
-export function ProjectAreasTree({ areas, activitySummaries, saplingsByAreaId }: ProjectAreasTreeProps) {
+export function ProjectAreasTree({ areas, activitySummaries }: ProjectAreasTreeProps) {
   const tree = useMemo(() => buildProjectAreaTree(areas), [areas]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
@@ -171,7 +162,6 @@ export function ProjectAreasTree({ areas, activitySummaries, saplingsByAreaId }:
           expandedIds={expandedIds}
           onToggle={toggle}
           activitySummaries={activitySummaries}
-          saplingsByAreaId={saplingsByAreaId}
         />
       ))}
     </div>
