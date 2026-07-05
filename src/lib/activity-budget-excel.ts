@@ -1,21 +1,10 @@
 import { budgetAmount, budgetResourceAmount } from '@/lib/activity-budget-metrics';
 import type { ImportColumnSpec } from '@/lib/master-types';
 
-export type ActivityBudgetExportRow = {
-  id?: string;
-  project_area_id: string | null;
-  planned_quantity: number | null;
-  remarks: string | null;
-  activity?: { name?: string } | null;
-  project_area?: { name?: string } | null;
-  resources?: {
-    planned_quantity: number;
-    unit_rate: number | null;
-    resource?: { name?: string } | null;
-  }[];
-};
+import { budgetParentAreaText, budgetProjectAreaText, type ActivityBudgetListRow } from '@/lib/activity-budget-display';
 
 export const ACTIVITY_BUDGET_EXPORT_COLUMNS = [
+  { key: 'parent_area', header: 'Parent Area' },
   { key: 'project_area', header: 'Project Area' },
   { key: 'activity', header: 'Activity' },
   { key: 'planned_quantity', header: 'Planned Qty' },
@@ -37,11 +26,12 @@ export const ACTIVITY_BUDGET_IMPORT_COLUMNS: ImportColumnSpec[] = [
   { key: 'remarks', header: 'Remarks', type: 'text' },
 ];
 
-export function flattenActivityBudgetsForExport(budgets: ActivityBudgetExportRow[]): Record<string, unknown>[] {
+export function flattenActivityBudgetsForExport(budgets: ActivityBudgetListRow[]): Record<string, unknown>[] {
   const rows: Record<string, unknown>[] = [];
 
   for (const budget of budgets) {
-    const areaName = budget.project_area?.name || 'Whole project';
+    const parentArea = budgetParentAreaText(budget);
+    const areaName = budgetProjectAreaText(budget);
     const activityName = budget.activity?.name || '';
     const headerQty = budget.planned_quantity ?? '';
     const remarks = budget.remarks || '';
@@ -50,6 +40,7 @@ export function flattenActivityBudgetsForExport(budgets: ActivityBudgetExportRow
 
     if (!resources.length) {
       rows.push({
+        parent_area: parentArea,
         project_area: areaName,
         activity: activityName,
         planned_quantity: headerQty,
@@ -65,6 +56,7 @@ export function flattenActivityBudgetsForExport(budgets: ActivityBudgetExportRow
 
     for (const item of resources) {
       rows.push({
+        parent_area: parentArea,
         project_area: areaName,
         activity: activityName,
         planned_quantity: headerQty,
