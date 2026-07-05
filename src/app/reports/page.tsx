@@ -17,7 +17,7 @@ const REPORT_SECTIONS = [
   {
     title: 'Project Reports',
     items: [
-      { label: 'Project Progress', href: '/dashboard', icon: BarChart3, desc: 'Budget, trees, activities overview' },
+      { label: 'Project Progress', href: '/dashboard', icon: BarChart3, desc: 'Budget, trees, activities overview with CSR PDF export' },
       { label: 'Tree Census Report', href: '/census', icon: TreePine, desc: 'Health status by area' },
       { label: 'Nursery Stock Report', href: '/nursery', icon: Sprout, desc: 'Inward, issue, and balance' },
     ],
@@ -41,7 +41,7 @@ const REPORT_SECTIONS = [
   {
     title: 'ESG',
     items: [
-      { label: 'ESG Report', href: '/reports', icon: BarChart3, desc: 'Periodic ESG report to CSR partner (coming soon)' },
+      { label: 'CSR Progress PDF', href: '/dashboard', icon: BarChart3, desc: 'Cluster-wise progress report with charts for CSR partners' },
     ],
   },
 ];

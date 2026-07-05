@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProjectAreasTree } from '@/components/projects/project-areas-tree';
 import { ProjectAreaActivitySummaryTable } from '@/components/projects/project-area-activity-summary';
+import { CsrProgressPdfButton } from '@/components/projects/csr-progress-pdf-button';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import {
   buildRolledUpSummariesByArea,
@@ -94,9 +95,18 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Overview</h2>
-          <p className="text-gray-500 mt-1">Key metrics for the selected project</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Overview</h2>
+            <p className="text-gray-500 mt-1">Key metrics for the selected project</p>
+          </div>
+          {selectedProject && (
+            <CsrProgressPdfButton
+              projectId={selectedProject.id}
+              projectName={selectedProject.name}
+              projectCode={selectedProject.code}
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

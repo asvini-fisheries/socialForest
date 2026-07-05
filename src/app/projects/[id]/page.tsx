@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
 import { ProjectAreasTree } from '@/components/projects/project-areas-tree';
 import { ProjectAreaActivitySummaryTable } from '@/components/projects/project-area-activity-summary';
+import { CsrProgressPdfButton } from '@/components/projects/csr-progress-pdf-button';
 import { useAuth } from '@/contexts/auth-context';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import type { Project, ProjectArea } from '@/types/database';
@@ -150,12 +151,19 @@ export default function ProjectDetailPage() {
                 )}
               </div>
               </div>
-              {isAdmin && (
-                <Button variant="outline" onClick={() => setEditOpen(true)}>
-                  <Pencil className="w-4 h-4" />
-                  Edit Project
-                </Button>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {isAdmin && (
+                  <Button variant="outline" onClick={() => setEditOpen(true)}>
+                    <Pencil className="w-4 h-4" />
+                    Edit Project
+                  </Button>
+                )}
+                <CsrProgressPdfButton
+                  projectId={project.id}
+                  projectName={project.name}
+                  projectCode={project.code}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
