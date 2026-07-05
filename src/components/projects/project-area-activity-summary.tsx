@@ -39,6 +39,15 @@ const EXPORT_COLUMNS = [
   { key: 'amount', header: 'Amount' },
 ];
 
+const METRIC_GRID_WITH_BUDGET =
+  'grid grid-cols-[minmax(0,1fr)_4.5rem_5.5rem_7rem_7rem] gap-3 items-center px-3';
+const METRIC_GRID = 'grid grid-cols-[minmax(0,1fr)_4.5rem_5.5rem_7rem] gap-3 items-center px-3';
+
+function metricRowGridClass(showBudgetComparison: boolean, extra = ''): string {
+  const base = showBudgetComparison ? METRIC_GRID_WITH_BUDGET : METRIC_GRID;
+  return extra ? `${base} ${extra}` : base;
+}
+
 function ExpandButton({
   expanded,
   onToggle,
@@ -138,7 +147,12 @@ function ActivityNode({
 
   return (
     <div style={{ marginLeft: depth * 12 }}>
-      <div className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-emerald-50/60 text-sm">
+      <div
+        className={metricRowGridClass(
+          showBudgetComparison,
+          'py-2 rounded-lg bg-emerald-50/60 text-sm text-gray-800'
+        )}
+      >
         <div className="flex items-center gap-2 min-w-0">
           {hasDetails ? (
             <ExpandButton
@@ -149,20 +163,18 @@ function ActivityNode({
           ) : (
             <span className="w-6 shrink-0" />
           )}
-          <span className="font-medium text-gray-800 truncate">{activity.activityName}</span>
+          <span className="font-medium truncate">{activity.activityName}</span>
         </div>
-        <div className="flex gap-4 shrink-0 tabular-nums text-gray-800">
-          <span>{formatNumber(activity.quantity)}</span>
-          <span className="min-w-[4rem] text-right">
-            {activity.saplings ? formatNumber(activity.saplings) : '—'}
+        <span className="text-right tabular-nums">{formatNumber(activity.quantity)}</span>
+        <span className="text-right tabular-nums">
+          {activity.saplings ? formatNumber(activity.saplings) : '—'}
+        </span>
+        {showBudgetComparison && (
+          <span className="text-right tabular-nums text-amber-700">
+            {plannedAmount ? formatCurrency(plannedAmount) : '—'}
           </span>
-          {showBudgetComparison && (
-            <span className="min-w-[5.5rem] text-right text-amber-700">
-              {plannedAmount ? formatCurrency(plannedAmount) : '—'}
-            </span>
-          )}
-          <span className="min-w-[5.5rem] text-right">{formatCurrency(activity.amount)}</span>
-        </div>
+        )}
+        <span className="text-right tabular-nums">{formatCurrency(activity.amount)}</span>
       </div>
       {expanded && hasDetails && <DetailRows details={activity.details} depth={depth + 1} />}
     </div>
@@ -190,7 +202,12 @@ function ClusterNode({
 
   return (
     <div className="rounded-lg border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between gap-2 p-3 bg-gray-50 text-sm">
+      <div
+        className={metricRowGridClass(
+          showBudgetComparison,
+          'p-3 bg-gray-50 text-sm font-semibold text-gray-900'
+        )}
+      >
         <div className="flex items-center gap-2 min-w-0">
           {hasActivities ? (
             <ExpandButton
@@ -202,31 +219,28 @@ function ClusterNode({
             <span className="w-6 shrink-0" />
           )}
           <div className="min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{cluster.areaName}</p>
-            {cluster.areaCode && <p className="text-xs text-gray-500">{cluster.areaCode}</p>}
+            <p className="truncate">{cluster.areaName}</p>
+            {cluster.areaCode && <p className="text-xs font-normal text-gray-500">{cluster.areaCode}</p>}
           </div>
         </div>
-        <div className="flex gap-4 shrink-0 tabular-nums font-semibold text-gray-900">
-          <span>{formatNumber(cluster.quantity)}</span>
-          <span className="min-w-[4rem] text-right">
-            {cluster.saplings ? formatNumber(cluster.saplings) : '—'}
+        <span className="text-right tabular-nums">{formatNumber(cluster.quantity)}</span>
+        <span className="text-right tabular-nums">
+          {cluster.saplings ? formatNumber(cluster.saplings) : '—'}
+        </span>
+        {showBudgetComparison && (
+          <span className="text-right tabular-nums text-amber-700">
+            {clusterPlanned.amount ? formatCurrency(clusterPlanned.amount) : '—'}
           </span>
-          {showBudgetComparison && (
-            <span className="min-w-[5.5rem] text-right text-amber-700">
-              {clusterPlanned.amount ? formatCurrency(clusterPlanned.amount) : '—'}
-            </span>
-          )}
-          <span className="min-w-[5.5rem] text-right">{formatCurrency(cluster.amount)}</span>
-        </div>
+        )}
+        <span className="text-right tabular-nums">{formatCurrency(cluster.amount)}</span>
       </div>
       {expanded && hasActivities && (
         <div className="p-2 space-y-1 bg-white">
           <div
-            className={`grid gap-2 px-3 py-1 text-xs font-medium text-gray-400 ${
-              showBudgetComparison
-                ? 'grid-cols-[1fr_auto_auto_auto_auto]'
-                : 'grid-cols-[1fr_auto_auto_auto]'
-            }`}
+            className={metricRowGridClass(
+              showBudgetComparison,
+              'py-1 text-xs font-medium text-gray-400'
+            )}
           >
             <span>Activity</span>
             <span className="text-right">Quantity</span>
@@ -335,11 +349,10 @@ export function ProjectAreaActivitySummaryTable({
       </div>
 
       <div
-        className={`grid gap-2 px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-200 ${
-          showBudgetComparison
-            ? 'grid-cols-[1fr_auto_auto_auto_auto]'
-            : 'grid-cols-[1fr_auto_auto_auto]'
-        }`}
+        className={metricRowGridClass(
+          showBudgetComparison,
+          'py-2 text-xs font-medium text-gray-500 border-b border-gray-200'
+        )}
       >
         <span>Cluster / Project Area</span>
         <span className="text-right">Quantity</span>
@@ -360,23 +373,22 @@ export function ProjectAreaActivitySummaryTable({
       ))}
 
       <div
-        className={`grid gap-2 px-3 py-3 rounded-lg bg-gray-50 font-semibold text-sm text-gray-900 border-t-2 border-gray-200 ${
-          showBudgetComparison
-            ? 'grid-cols-[1fr_auto_auto_auto_auto]'
-            : 'grid-cols-[1fr_auto_auto_auto]'
-        }`}
+        className={metricRowGridClass(
+          showBudgetComparison,
+          'py-3 rounded-lg bg-gray-50 font-semibold text-sm text-gray-900 border-t-2 border-gray-200'
+        )}
       >
         <span>Grand total</span>
         <span className="text-right tabular-nums">{formatNumber(grandQuantity)}</span>
-        <span className="text-right tabular-nums min-w-[4rem]">
+        <span className="text-right tabular-nums">
           {grandSaplings ? formatNumber(grandSaplings) : '—'}
         </span>
         {showBudgetComparison && (
-          <span className="text-right tabular-nums min-w-[5.5rem] text-amber-700">
+          <span className="text-right tabular-nums text-amber-700">
             {totalPlanned ? formatCurrency(totalPlanned) : '—'}
           </span>
         )}
-        <span className="text-right tabular-nums min-w-[5.5rem]">{formatCurrency(grandAmount)}</span>
+        <span className="text-right tabular-nums">{formatCurrency(grandAmount)}</span>
       </div>
     </div>
   );
