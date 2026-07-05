@@ -71,11 +71,7 @@ function pct(numerator: number, denominator: number): number {
   return Math.min(100, (numerator / denominator) * 100);
 }
 
-function clusterRootId(
-  areaId: string | null,
-  areaById: Map<string, ProjectArea>,
-  parentById: Map<string, string | null>
-): string | null {
+function clusterRootId(areaId: string | null, areaById: Map<string, ProjectArea>): string | null {
   if (!areaId) return null;
   let current: string | null = areaId;
   while (current) {
@@ -89,11 +85,10 @@ function clusterRootId(
 function sumTreesPlantedForArea(
   entries: DailyActivityAreaRow[],
   areaId: string,
-  areaById: Map<string, ProjectArea>,
-  parentById: Map<string, string | null>
+  areaById: Map<string, ProjectArea>
 ): number {
   return entries.reduce((sum, entry) => {
-    const rootId = clusterRootId(entry.project_area_id, areaById, parentById);
+    const rootId = clusterRootId(entry.project_area_id, areaById);
     if (entry.project_area_id === areaId || rootId === areaId) {
       return sum + treePlantationSpeciesQuantity(entry);
     }
@@ -175,7 +170,7 @@ export function buildCsrProgressReportData(input: {
         .filter((area) => area.parent_area_id === cluster.id && area.level === 2)
         .sort((a, b) => (a.code || a.name).localeCompare(b.code || b.name, undefined, { numeric: true }))
         .map((block) => {
-          const blockTreesPlanted = sumTreesPlantedForArea(entries, block.id, areaById, parentById);
+          const blockTreesPlanted = sumTreesPlantedForArea(entries, block.id, areaById);
           const blockSummary = rolledUp.get(block.id);
           const blockSaplings = blockSummary?.totalSaplings || sumSaplingsForArea(entries, block.id, areaById, parentById);
           const blockAmount = blockSummary?.totalAmount || 0;
@@ -197,7 +192,7 @@ export function buildCsrProgressReportData(input: {
       const clusterSummary = rolledUp.get(cluster.id);
       const clusterAmount = clusterSummary?.totalAmount || clusterFromTree?.amount || 0;
       const clusterSaplings = clusterSummary?.totalSaplings || clusterFromTree?.saplings || 0;
-      const clusterTreesPlanted = sumTreesPlantedForArea(entries, cluster.id, areaById, parentById);
+      const clusterTreesPlanted = sumTreesPlantedForArea(entries, cluster.id, areaById);
 
       return {
         areaId: cluster.id,

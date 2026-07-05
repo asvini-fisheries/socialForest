@@ -123,7 +123,7 @@ export function drawProgressBarChart(doc: jsPDF, options: ProgressBarChartOption
   doc.setFontSize(11);
   doc.setTextColor(30);
   doc.text(title, x, y);
-  let cursorY = y + 18;
+  const cursorY = y + 18;
 
   for (let index = 0; index < categories.length; index += 1) {
     const value = Math.max(0, Math.min(maxValue, values[index] || 0));

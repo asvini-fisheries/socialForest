@@ -239,7 +239,6 @@ export function buildCsrProgressReportPdf(data: CsrProgressReportData): Uint8Arr
 
   if (data.activityTree.length > 0) {
     doc.addPage('a4', 'landscape');
-    const landscapeWidth = doc.internal.pageSize.getWidth();
     const landscapeMargin = 36;
     let landscapeY = landscapeMargin;
 
