@@ -6,8 +6,24 @@ export type ClusterBlockMatrix = {
   cells: Record<string, ProjectArea | null>;
 };
 
+/** Cluster letter from name "CLUSTER A" or code "A" */
+export function parseClusterLetter(cluster: ProjectArea): string {
+  const fromName = cluster.name.match(/CLUSTER\s+([A-Z])/i);
+  if (fromName) return fromName[1].toUpperCase();
+  if (cluster.code && /^[A-Z]$/i.test(cluster.code.trim())) return cluster.code.trim().toUpperCase();
+  if (cluster.code) {
+    const match = cluster.code.match(/^([A-Z])/i);
+    if (match) return match[1].toUpperCase();
+  }
+  return 'A';
+}
+
 /** e.g. A1 from code "A1-BLK-1" or name "A1 Block 3" */
-export function parseSectionLabel(area: ProjectArea): string {
+export function parseSectionLabel(
+  area: ProjectArea,
+  cluster?: ProjectArea,
+  sectionIndex?: number
+): string {
   if (area.code) {
     const parts = area.code.split('-');
     for (const part of parts) {
@@ -16,6 +32,9 @@ export function parseSectionLabel(area: ProjectArea): string {
   }
   const fromName = area.name.match(/\b([A-Z]\d+)\b/i);
   if (fromName) return fromName[1].toUpperCase();
+  if (cluster && sectionIndex !== undefined) {
+    return `${parseClusterLetter(cluster)}${sectionIndex + 1}`;
+  }
   return (area.code || area.name).slice(0, 8);
 }
 
@@ -28,29 +47,25 @@ export function parseBlockRowKey(area: ProjectArea): string {
   return `area-${area.id}`;
 }
 
-export function parseBlockRowLabel(key: string, area?: ProjectArea): string {
-  const match = key.match(/^block-(\d+)$/);
-  if (match) return `Block ${match[1]}`;
-  return area?.name || key;
-}
-
 function sortColumnLabels(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-}
-
-function sortRowKeys(a: string, b: string): number {
-  const numA = Number(a.match(/^block-(\d+)$/)?.[1] ?? 9999);
-  const numB = Number(b.match(/^block-(\d+)$/)?.[1] ?? 9999);
-  if (numA !== numB) return numA - numB;
-  return a.localeCompare(b);
 }
 
 function cellKey(columnId: string, rowKey: string): string {
   return `${columnId}::${rowKey}`;
 }
 
+export const CLUSTER_BLOCK_ROW_COUNT = 9;
+
+export function defaultBlockRows(): { key: string; label: string }[] {
+  return Array.from({ length: CLUSTER_BLOCK_ROW_COUNT }, (_, index) => {
+    const n = index + 1;
+    return { key: `block-${n}`, label: `Block ${n}` };
+  });
+}
+
 /**
- * Build A1–A5 column × Block row matrix for a level-1 cluster.
+ * Build column × Block row matrix for a level-1 cluster.
  * Supports level-2 sections with level-3 blocks, or flat blocks grouped by name prefix.
  */
 export function buildClusterBlockMatrix(cluster: ProjectArea): ClusterBlockMatrix | null {
@@ -59,36 +74,33 @@ export function buildClusterBlockMatrix(cluster: ProjectArea): ClusterBlockMatri
 
   const hasLevel2Sections = children.some((c) => c.level === 2);
   const columns: { id: string; label: string }[] = [];
-  const rowKeySet = new Set<string>();
   const cells: Record<string, ProjectArea | null> = {};
 
   if (hasLevel2Sections) {
     const sections = children
       .filter((c) => c.level === 2)
-      .sort((a, b) => sortColumnLabels(parseSectionLabel(a), parseSectionLabel(b)));
+      .sort((a, b) => sortColumnLabels(parseSectionLabel(a, cluster), parseSectionLabel(b, cluster)));
 
-    for (const section of sections) {
-      const label = parseSectionLabel(section);
+    for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+      const section = sections[sectionIndex];
+      const label = parseSectionLabel(section, cluster, sectionIndex);
       columns.push({ id: section.id, label });
 
       const blocks = section.children ?? [];
       if (blocks.length === 0) {
-        const rowKey = 'block-1';
-        rowKeySet.add(rowKey);
-        cells[cellKey(section.id, rowKey)] = section;
+        cells[cellKey(section.id, 'block-1')] = section;
         continue;
       }
 
       for (const block of blocks) {
         const rowKey = parseBlockRowKey(block);
-        rowKeySet.add(rowKey);
         cells[cellKey(section.id, rowKey)] = block;
       }
     }
   } else {
     const bySection = new Map<string, ProjectArea[]>();
     for (const block of children) {
-      const section = parseSectionLabel(block);
+      const section = parseSectionLabel(block, cluster);
       if (!bySection.has(section)) bySection.set(section, []);
       bySection.get(section)!.push(block);
     }
@@ -101,7 +113,6 @@ export function buildClusterBlockMatrix(cluster: ProjectArea): ClusterBlockMatri
 
       for (const block of blocks) {
         const rowKey = parseBlockRowKey(block);
-        rowKeySet.add(rowKey);
         cells[cellKey(colId, rowKey)] = block;
       }
     }
@@ -109,14 +120,7 @@ export function buildClusterBlockMatrix(cluster: ProjectArea): ClusterBlockMatri
 
   if (columns.length === 0) return null;
 
-  const rows = [...rowKeySet]
-    .sort(sortRowKeys)
-    .map((key) => {
-      const sample = Object.values(cells).find((a) => a && parseBlockRowKey(a) === key) ?? undefined;
-      return { key, label: parseBlockRowLabel(key, sample) };
-    });
-
-  return { columns, rows, cells };
+  return { columns, rows: defaultBlockRows(), cells };
 }
 
 export function getMatrixCell(

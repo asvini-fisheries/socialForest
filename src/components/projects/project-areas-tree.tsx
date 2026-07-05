@@ -11,6 +11,7 @@ import type { ProjectArea } from '@/types/database';
 interface ProjectAreasTreeProps {
   areas: ProjectArea[];
   activitySummaries?: Map<string, AreaActivitySummary>;
+  saplingsByAreaId?: Map<string, number>;
 }
 
 function ActivitySummaryLines({ summary }: { summary: AreaActivitySummary }) {
@@ -95,12 +96,14 @@ function AreaNode({
   expandedIds,
   onToggle,
   activitySummaries,
+  saplingsByAreaId,
 }: {
   area: ProjectArea;
   depth: number;
   expandedIds: Set<string>;
   onToggle: (id: string) => void;
   activitySummaries?: Map<string, AreaActivitySummary>;
+  saplingsByAreaId?: Map<string, number>;
 }) {
   const expanded = expandedIds.has(area.id);
   const children = area.children ?? [];
@@ -119,7 +122,9 @@ function AreaNode({
         hasExpandable={hasExpandable}
       />
       {expanded && summary && <ActivitySummaryLines summary={summary} />}
-      {expanded && isCluster && hasChildren && <ClusterBlockMatrix cluster={area} />}
+      {expanded && isCluster && hasChildren && (
+        <ClusterBlockMatrix cluster={area} saplingsByAreaId={saplingsByAreaId} />
+      )}
       {expanded && !isCluster && hasChildren && (
         <div className="mt-2 space-y-2">
           {children.map((child) => (
@@ -130,6 +135,7 @@ function AreaNode({
               expandedIds={expandedIds}
               onToggle={onToggle}
               activitySummaries={activitySummaries}
+              saplingsByAreaId={saplingsByAreaId}
             />
           ))}
         </div>
@@ -138,7 +144,7 @@ function AreaNode({
   );
 }
 
-export function ProjectAreasTree({ areas, activitySummaries }: ProjectAreasTreeProps) {
+export function ProjectAreasTree({ areas, activitySummaries, saplingsByAreaId }: ProjectAreasTreeProps) {
   const tree = useMemo(() => buildProjectAreaTree(areas), [areas]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
@@ -165,6 +171,7 @@ export function ProjectAreasTree({ areas, activitySummaries }: ProjectAreasTreeP
           expandedIds={expandedIds}
           onToggle={toggle}
           activitySummaries={activitySummaries}
+          saplingsByAreaId={saplingsByAreaId}
         />
       ))}
     </div>

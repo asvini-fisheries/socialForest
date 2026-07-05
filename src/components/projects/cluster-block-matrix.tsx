@@ -1,62 +1,81 @@
 'use client';
 
-import { Fragment } from 'react';
 import { formatNumber } from '@/lib/utils';
 import { buildClusterBlockMatrix, getMatrixCell } from '@/lib/project-area-matrix';
 import type { ProjectArea } from '@/types/database';
 
 interface ClusterBlockMatrixProps {
   cluster: ProjectArea;
+  saplingsByAreaId?: Map<string, number>;
 }
 
-function MatrixCell({ area }: { area: ProjectArea | null }) {
+function clusterTitle(area: ProjectArea): string {
+  const fromName = area.name.match(/CLUSTER\s+([A-Z0-9]+)/i);
+  if (fromName) return `Cluster ${fromName[1].toUpperCase()}`;
+  if (area.code) return `Cluster ${area.code}`;
+  return area.name;
+}
+
+function MatrixCell({
+  area,
+  saplingsByAreaId,
+}: {
+  area: ProjectArea | null;
+  saplingsByAreaId?: Map<string, number>;
+}) {
   if (!area) {
-    return <span className="text-gray-300">—</span>;
+    return <span className="text-gray-300">&nbsp;</span>;
   }
 
+  const saplings = saplingsByAreaId?.get(area.id) || 0;
+
   return (
-    <div className="text-center leading-tight">
-      <p className="font-medium text-gray-800 tabular-nums">{area.land_area_acres} ac</p>
-      <p className="text-[11px] text-gray-500 tabular-nums">{formatNumber(area.trees_planned)} trees</p>
+    <div className="text-center leading-snug py-1">
+      <p className="tabular-nums text-gray-900">{area.land_area_acres} ac</p>
+      <p className="tabular-nums text-gray-700">{formatNumber(saplings)} Sap</p>
     </div>
   );
 }
 
-export function ClusterBlockMatrix({ cluster }: ClusterBlockMatrixProps) {
+export function ClusterBlockMatrix({ cluster, saplingsByAreaId }: ClusterBlockMatrixProps) {
   const matrix = buildClusterBlockMatrix(cluster);
   if (!matrix || matrix.columns.length === 0) return null;
 
-  const colTemplate = `minmax(4.5rem,1fr) repeat(${matrix.columns.length}, minmax(4.5rem, 1fr))`;
-
   return (
-    <div className="mt-2 mb-2 ml-8 overflow-x-auto rounded-lg border border-gray-200 bg-white">
-      <div
-        className="grid gap-px bg-gray-200 text-xs min-w-max"
-        style={{ gridTemplateColumns: colTemplate }}
-      >
-        <div className="bg-gray-50 px-2 py-2 font-medium text-gray-500" />
-        {matrix.columns.map((col) => (
-          <div
-            key={col.id}
-            className="bg-gray-50 px-2 py-2 text-center font-semibold text-gray-700"
-          >
-            {col.label}
-          </div>
-        ))}
-
-        {matrix.rows.map((row) => (
-          <Fragment key={row.key}>
-            <div className="bg-gray-50 px-2 py-2 font-medium text-gray-600 whitespace-nowrap">
-              {row.label}
-            </div>
+    <div className="mt-3 mb-2 ml-8 overflow-x-auto">
+      <p className="text-sm font-semibold text-gray-800 mb-1">{clusterTitle(cluster)}</p>
+      <table className="w-full min-w-[20rem] border-collapse border border-gray-400 text-xs bg-white">
+        <thead>
+          <tr>
+            <th className="border border-gray-400 bg-gray-50 px-2 py-1.5 text-left font-medium text-gray-600 w-20" />
             {matrix.columns.map((col) => (
-              <div key={`${row.key}-${col.id}`} className="bg-white px-2 py-2">
-                <MatrixCell area={getMatrixCell(matrix, col.id, row.key)} />
-              </div>
+              <th
+                key={col.id}
+                className="border border-gray-400 bg-gray-50 px-2 py-1.5 text-center font-semibold text-gray-800"
+              >
+                {col.label}
+              </th>
             ))}
-          </Fragment>
-        ))}
-      </div>
+          </tr>
+        </thead>
+        <tbody>
+          {matrix.rows.map((row) => (
+            <tr key={row.key}>
+              <th className="border border-gray-400 bg-gray-50 px-2 py-1 text-left font-medium text-gray-700 whitespace-nowrap">
+                {row.label}
+              </th>
+              {matrix.columns.map((col) => (
+                <td key={`${row.key}-${col.id}`} className="border border-gray-400 px-2 py-1 align-middle">
+                  <MatrixCell
+                    area={getMatrixCell(matrix, col.id, row.key)}
+                    saplingsByAreaId={saplingsByAreaId}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

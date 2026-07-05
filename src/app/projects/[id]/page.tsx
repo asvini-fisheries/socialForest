@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchDailyActivities } from '@/lib/daily-activities-client';
-import { sumActivityAmount, sumTreePlantationSpeciesQuantity } from '@/lib/daily-activity-metrics';
+import { sumActivityAmount, sumTreePlantationSpeciesQuantity, buildSaplingsByAreaId } from '@/lib/daily-activity-metrics';
 import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
 
 export default function ProjectDetailPage() {
@@ -87,6 +87,11 @@ export default function ProjectDetailPage() {
   const rolledUpSummaries = useMemo(
     () => buildRolledUpSummariesByArea(areas, activityEntries),
     [areas, activityEntries]
+  );
+
+  const saplingsByAreaId = useMemo(
+    () => buildSaplingsByAreaId(activityEntries),
+    [activityEntries]
   );
 
   const treesPlanted = useMemo(
@@ -225,7 +230,11 @@ export default function ProjectDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ProjectAreasTree areas={areas} activitySummaries={rolledUpSummaries} />
+                  <ProjectAreasTree
+                    areas={areas}
+                    activitySummaries={rolledUpSummaries}
+                    saplingsByAreaId={saplingsByAreaId}
+                  />
                 </CardContent>
               </Card>
             </div>
