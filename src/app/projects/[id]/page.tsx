@@ -36,7 +36,7 @@ import { formatProjectStatus, PROJECT_STATUS_STYLES } from '@/lib/projects';
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, selectProject } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [project, setProject] = useState<Project | null>(null);
   const [areas, setAreas] = useState<ProjectArea[]>([]);
@@ -86,12 +86,14 @@ export default function ProjectDetailPage() {
       setActivityError(err instanceof Error ? err.message : 'Failed to load activities');
     }
 
-    setProject(projectRes.data as Project);
+    const loadedProject = projectRes.data as Project;
+    setProject(loadedProject);
+    selectProject(loadedProject);
     setAreas((areasRes.data as ProjectArea[]) || []);
     setActivityEntries(activityRows);
     setBudgetEntries(budgetRows);
     setLoading(false);
-  }, [id]);
+  }, [id, selectProject]);
 
   const rolledUpSummaries = useMemo(
     () => buildRolledUpSummariesByArea(areas, activityEntries),

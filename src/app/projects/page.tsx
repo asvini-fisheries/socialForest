@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 export default function ProjectsPage() {
-  const { user, selectedYear } = useAuth();
+  const { user, selectedYear, selectedProject, selectProject } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,9 +117,19 @@ export default function ProjectsPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {projects.map((project) => (
-              <Link key={project.id} href={`/projects/${project.id}`}>
-                <Card className="hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer h-full">
+            {projects.map((project) => {
+              const isSelected = selectedProject?.id === project.id;
+              return (
+              <Link
+                key={project.id}
+                href={`/projects/${project.id}`}
+                onClick={() => selectProject(project)}
+              >
+                <Card
+                  className={`hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer h-full ${
+                    isSelected ? 'border-emerald-400 ring-1 ring-emerald-200 bg-emerald-50/40' : ''
+                  }`}
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
@@ -128,6 +138,9 @@ export default function ProjectsPage() {
                         <CardTitle className="text-lg">{project.name}</CardTitle>
                         {project.code && (
                           <p className="text-sm text-gray-500 mt-0.5">{project.code}</p>
+                        )}
+                        {isSelected && (
+                          <p className="text-xs font-medium text-emerald-700 mt-1">Active project</p>
                         )}
                         </div>
                       </div>
@@ -191,7 +204,8 @@ export default function ProjectsPage() {
                   </CardContent>
                 </Card>
               </Link>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

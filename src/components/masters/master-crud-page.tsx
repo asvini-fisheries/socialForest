@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ interface MasterCrudPageProps {
 }
 
 export function MasterCrudPage({ config }: MasterCrudPageProps) {
-  const { user, selectedProject } = useAuth();
+  const { user, selectedProject, sessionReady } = useAuth();
   const isAdmin = user?.role === 'admin';
   const tableSpec = getMasterTableSpec(config.table);
   const searchKeys = useMemo(
@@ -41,6 +41,9 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     config.imageAttachments ?? masterTableSupportsImages(config.table);
   const imageField = config.imageField ?? getMasterImageField(config.table);
   const mutationApi = config.apiRoute ?? `/api/masters/${config.table}/record`;
+  const projectScope = useMemo(() => getMasterProjectScope(config.table), [config.table]);
+  const isProjectScoped = projectScope.type !== 'none';
+  const loadRequestIdRef = useRef(0);
 
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [search, setSearch] = useState('');
@@ -113,9 +116,16 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
     return map;
   }, [config.columnFilters, enrichedRows]);
 
-  const projectScope = useMemo(() => getMasterProjectScope(config.table), [config.table]);
-
   const loadRows = useCallback(async () => {
+    if (!sessionReady) return;
+
+    if (isProjectScoped && !selectedProject?.id) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
+    const requestId = ++loadRequestIdRef.current;
     setLoading(true);
     setError('');
 
@@ -124,6 +134,8 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
         selectedProject?.id && apiProjectFilterColumn(config.table)
           ? `?project_id=${encodeURIComponent(selectedProject.id)}`
           : '';
+
+      let data: Record<string, unknown>[] = [];
 
       if (isAdmin) {
         const selectQuery = config.selectQuery || tableSpec?.selectQuery;
@@ -135,14 +147,7 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
         );
         if (!res.ok) throw new Error(await parseMasterApiError(res));
         const result = (await res.json()) as { data?: Record<string, unknown>[] };
-        let data = result.data || [];
-        if (config.table === 'project_areas') {
-          data = enrichProjectAreaParents(data);
-        }
-        if (projectScope.type === 'nested' || projectScope.type === 'optionalField') {
-          data = filterRowsByProject(data, config.table, selectedProject?.id ?? '');
-        }
-        setRows(data);
+        data = result.data || [];
       } else {
         const supabase = createClient();
         let query = supabase.from(config.table).select(config.selectQuery || '*').order(config.orderBy);
@@ -155,28 +160,55 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
         if (filterCol && selectedProject?.id) {
           query = query.eq(filterCol, selectedProject.id);
         }
-        const { data, error: err } = await query;
+        const { data: queryData, error: err } = await query;
         if (err) throw err;
-        let rows = (data as unknown as Record<string, unknown>[]) || [];
-        if (config.table === 'project_areas') {
-          rows = enrichProjectAreaParents(rows);
-        }
-        if (projectScope.type === 'nested' || projectScope.type === 'optionalField') {
-          rows = filterRowsByProject(rows, config.table, selectedProject?.id ?? '');
-        }
-        setRows(rows);
+        data = (queryData as unknown as Record<string, unknown>[]) || [];
       }
+
+      if (config.table === 'project_areas') {
+        data = enrichProjectAreaParents(data);
+      }
+
+      // Always enforce selected-project scope client-side (avoids stale unscoped responses).
+      if (isProjectScoped && selectedProject?.id) {
+        data = filterRowsByProject(data, config.table, selectedProject.id);
+      }
+
+      if (requestId !== loadRequestIdRef.current) return;
+      setRows(data);
     } catch (err) {
+      if (requestId !== loadRequestIdRef.current) return;
       setError(err instanceof Error ? err.message : 'Failed to load records');
       setRows([]);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [config.table, config.orderBy, config.selectQuery, isAdmin, projectScope, selectedProject?.id, tableSpec?.selectQuery]);
+  }, [
+    config.table,
+    config.orderBy,
+    config.selectQuery,
+    isAdmin,
+    isProjectScoped,
+    projectScope,
+    selectedProject?.id,
+    sessionReady,
+    tableSpec?.selectQuery,
+  ]);
 
   useEffect(() => {
     loadRows();
   }, [loadRows]);
+
+  // Default the Project text filter to the logged-in project.
+  useEffect(() => {
+    if (!selectedProject || !config.columnFilters?.some((filter) => filter.id === 'project')) {
+      return;
+    }
+    const defaultText = selectedProject.code || selectedProject.name || '';
+    setColumnFilterValues((prev) => ({ ...prev, project: defaultText }));
+  }, [selectedProject?.id, selectedProject?.code, selectedProject?.name, config.columnFilters]);
 
   useEffect(() => {
     async function loadDynamicOptions() {
@@ -449,6 +481,18 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
 
   const Icon = config.icon;
 
+  if (sessionReady && isProjectScoped && !selectedProject) {
+    return (
+      <DashboardLayout>
+        <EmptyState
+          icon={Icon}
+          title="No project selected"
+          description="Select a project at login to view this master data"
+        />
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -457,10 +501,16 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
             <h2 className="text-xl font-bold text-gray-900">{config.title}</h2>
             <p className="text-gray-500 mt-1">
               {isAdmin ? 'Search, import/export, and manage master records' : 'View master data (read only)'}
+              {isProjectScoped && selectedProject && (
+                <span className="block text-sm text-emerald-700 mt-1">
+                  Showing data for {selectedProject.name}
+                  {selectedProject.code ? ` (${selectedProject.code})` : ''}
+                </span>
+              )}
             </p>
           </div>
           {isAdmin && (
-            <Button onClick={openCreate}>
+            <Button onClick={openCreate} disabled={isProjectScoped && !selectedProject}>
               <Plus className="w-4 h-4" />
               Add New
             </Button>
@@ -496,23 +546,27 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
 
         {config.columnFilters && config.columnFilters.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {config.columnFilters.map((filter) =>
-              filter.mode === 'multiselect' ? (
-                <MultiSelectFilter
-                  key={filter.id}
-                  label={filter.label}
-                  placeholder={filter.placeholder || `All ${filter.label.toLowerCase()}`}
-                  options={filterOptionsById[filter.id] ?? []}
-                  value={
-                    Array.isArray(columnFilterValues[filter.id])
-                      ? (columnFilterValues[filter.id] as string[])
-                      : []
-                  }
-                  onChange={(next) =>
-                    setColumnFilterValues((prev) => ({ ...prev, [filter.id]: next }))
-                  }
-                />
-              ) : (
+            {config.columnFilters.map((filter) => {
+              const lockProjectFilter = filter.id === 'project' && Boolean(selectedProject?.id);
+              if (filter.mode === 'multiselect') {
+                return (
+                  <MultiSelectFilter
+                    key={filter.id}
+                    label={filter.label}
+                    placeholder={filter.placeholder || `All ${filter.label.toLowerCase()}`}
+                    options={filterOptionsById[filter.id] ?? []}
+                    value={
+                      Array.isArray(columnFilterValues[filter.id])
+                        ? (columnFilterValues[filter.id] as string[])
+                        : []
+                    }
+                    onChange={(next) =>
+                      setColumnFilterValues((prev) => ({ ...prev, [filter.id]: next }))
+                    }
+                  />
+                );
+              }
+              return (
                 <Input
                   key={filter.id}
                   label={filter.label}
@@ -521,9 +575,10 @@ export function MasterCrudPage({ config }: MasterCrudPageProps) {
                   onChange={(e) =>
                     setColumnFilterValues((prev) => ({ ...prev, [filter.id]: e.target.value }))
                   }
+                  disabled={lockProjectFilter}
                 />
-              )
-            )}
+              );
+            })}
           </div>
         )}
 
