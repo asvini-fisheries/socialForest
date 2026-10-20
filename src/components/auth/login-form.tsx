@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Phone, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { Phone, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,23 +10,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { createClient } from '@/lib/supabase/client';
 import { validateMobile, maskMobile } from '@/lib/utils';
 import { getAuthErrorMessage, validateEmail, maskEmail } from '@/lib/auth-errors';
+import { isTempDefaultOtp, TEMP_DEFAULT_OTP } from '@/lib/auth-temp';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { fetchAllProjectsForUser } from '@/lib/projects';
 import type { User, Project } from '@/types/database';
 import { ROLE_LABELS } from '@/types/database';
 
-type LoginMethod = 'email' | 'mobile';
+type LoginMethod = 'email' | 'mobile' | 'password';
 type LoginStep = 'credentials' | 'otp' | 'selection';
+
+type DefaultOtpResponse =
+  | { mode: 'token_hash'; token_hash: string; type: 'email' }
+  | { mode: 'password'; email: string | null; phone: string | null; password: string }
+  | { error: string };
 
 export function LoginForm() {
   const [method, setMethod] = useState<LoginMethod>('email');
   const [step, setStep] = useState<LoginStep>('credentials');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
+  const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -35,8 +43,100 @@ export function LoginForm() {
   const router = useRouter();
   const supabase = createClient();
 
+  async function loadUserProfileByIdentifier(): Promise<User> {
+    let query = supabase.from('users').select('*');
+
+    if (method === 'mobile') {
+      query = query.eq('mobile', mobile);
+    } else {
+      query = query.eq('email', email.trim().toLowerCase());
+    }
+
+    const { data: profile, error: profileError } = await query.single();
+
+    if (profileError || !profile) {
+      throw new Error('User profile not found. Contact your administrator to create your account.');
+    }
+
+    if (profile.status !== 'active') {
+      throw new Error('Your account is inactive. Contact your administrator.');
+    }
+
+    return profile;
+  }
+
+  async function loadUserProfileByAuthId(authUserId: string): Promise<User> {
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authUserId)
+      .single();
+
+    if (profileError || !profile) {
+      throw new Error('User profile not found. Contact your administrator to create your account.');
+    }
+
+    if (profile.status !== 'active') {
+      throw new Error('Your account is inactive. Contact your administrator.');
+    }
+
+    return profile;
+  }
+
+  async function continueToProjectSelection(profile: User) {
+    setUserProfile(profile);
+
+    const projectsData = await fetchAllProjectsForUser(profile);
+    if (projectsData.length === 0) {
+      setError('No active projects are assigned to your account. Contact your administrator.');
+      return;
+    }
+    setProjects(projectsData);
+    setSelectedProjectId(projectsData[0].id);
+    setStep('selection');
+  }
+
+  async function establishSessionWithDefaultOtp(identifier: {
+    email?: string;
+    mobile?: string;
+  }) {
+    const res = await fetch('/api/auth/default-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: identifier.email,
+        mobile: identifier.mobile,
+        otp: TEMP_DEFAULT_OTP,
+      }),
+    });
+
+    const data = (await res.json()) as DefaultOtpResponse;
+    if (!res.ok || 'error' in data) {
+      throw new Error(
+        'error' in data && data.error ? data.error : 'Temporary sign-in failed. Please try again.'
+      );
+    }
+
+    if (data.mode === 'token_hash') {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: data.token_hash,
+        type: data.type,
+      });
+      if (verifyError) throw verifyError;
+      return;
+    }
+
+    const { error: passwordError } = await supabase.auth.signInWithPassword(
+      data.email
+        ? { email: data.email, password: data.password }
+        : { phone: data.phone!, password: data.password }
+    );
+    if (passwordError) throw passwordError;
+  }
+
   async function handleSendOtp() {
     setError('');
+    setInfo('');
 
     if (method === 'email') {
       if (!validateEmail(email)) {
@@ -61,35 +161,23 @@ export function LoginForm() {
               options: { shouldCreateUser: false },
             });
 
-      if (otpError) throw otpError;
+      if (otpError) {
+        // Temporary: OTP delivery may be unavailable — still allow default code.
+        setInfo(
+          `Verification code could not be delivered. For now, use temporary code ${TEMP_DEFAULT_OTP}.`
+        );
+      } else {
+        setInfo(`If you do not receive a code, use temporary code ${TEMP_DEFAULT_OTP}.`);
+      }
       setStep('otp');
-    } catch (err) {
-      setError(getAuthErrorMessage(err, 'Failed to send verification code. Please try again.'));
+    } catch {
+      setInfo(
+        `Verification code could not be delivered. For now, use temporary code ${TEMP_DEFAULT_OTP}.`
+      );
+      setStep('otp');
     } finally {
       setLoading(false);
     }
-  }
-
-  async function loadUserProfile(): Promise<User> {
-    let query = supabase.from('users').select('*');
-
-    if (method === 'email') {
-      query = query.eq('email', email.trim().toLowerCase());
-    } else {
-      query = query.eq('mobile', mobile);
-    }
-
-    const { data: profile, error: profileError } = await query.single();
-
-    if (profileError || !profile) {
-      throw new Error('User profile not found. Contact your administrator to create your account.');
-    }
-
-    if (profile.status !== 'active') {
-      throw new Error('Your account is inactive. Contact your administrator.');
-    }
-
-    return profile;
   }
 
   async function handleVerifyOtp() {
@@ -101,34 +189,80 @@ export function LoginForm() {
 
     setLoading(true);
     try {
-      const { error: verifyError } =
-        method === 'email'
-          ? await supabase.auth.verifyOtp({
-              email: email.trim().toLowerCase(),
-              token: otp,
-              type: 'email',
-            })
-          : await supabase.auth.verifyOtp({
-              phone: `+91${mobile}`,
-              token: otp,
-              type: 'sms',
-            });
+      if (isTempDefaultOtp(otp)) {
+        await establishSessionWithDefaultOtp(
+          method === 'email'
+            ? { email: email.trim().toLowerCase() }
+            : { mobile }
+        );
+      } else {
+        const { error: verifyError } =
+          method === 'email'
+            ? await supabase.auth.verifyOtp({
+                email: email.trim().toLowerCase(),
+                token: otp,
+                type: 'email',
+              })
+            : await supabase.auth.verifyOtp({
+                phone: `+91${mobile}`,
+                token: otp,
+                type: 'sms',
+              });
 
-      if (verifyError) throw verifyError;
-
-      const profile = await loadUserProfile();
-      setUserProfile(profile);
-
-      const projectsData = await fetchAllProjectsForUser(profile);
-      if (projectsData.length === 0) {
-        setError('No active projects are assigned to your account. Contact your administrator.');
-        return;
+        if (verifyError) throw verifyError;
       }
-      setProjects(projectsData);
-      setSelectedProjectId(projectsData[0].id);
-      setStep('selection');
+
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      const profile = authUser?.id
+        ? await loadUserProfileByAuthId(authUser.id)
+        : await loadUserProfileByIdentifier();
+
+      await continueToProjectSelection(profile);
     } catch (err) {
       setError(getAuthErrorMessage(err, 'Verification failed. Please check the code and try again.'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePasswordLogin() {
+    setError('');
+    setInfo('');
+
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    if (!password.trim()) {
+      setError('Please enter your password');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (isTempDefaultOtp(password)) {
+        await establishSessionWithDefaultOtp({ email: email.trim().toLowerCase() });
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+        if (signInError) throw signInError;
+      }
+
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!authUser) throw new Error('Sign-in succeeded but no session was created.');
+
+      const profile = await loadUserProfileByAuthId(authUser.id);
+      await continueToProjectSelection(profile);
+    } catch (err) {
+      setError(getAuthErrorMessage(err, 'Invalid email or password. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -152,6 +286,7 @@ export function LoginForm() {
     setStep('credentials');
     setOtp('');
     setError('');
+    setInfo('');
   }
 
   function switchMethod(next: LoginMethod) {
@@ -181,7 +316,7 @@ export function LoginForm() {
               {step === 'selection' && 'Select Project'}
             </CardTitle>
             <CardDescription>
-              {step === 'credentials' && 'Sign in with your registered email or mobile number'}
+              {step === 'credentials' && 'Sign in with password, email OTP, or mobile OTP'}
               {step === 'otp' && `Verification code sent to ${otpTarget}`}
               {step === 'selection' && userProfile && (
                 <span>
@@ -196,6 +331,11 @@ export function LoginForm() {
                 {error}
               </div>
             )}
+            {info && !error && (
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-sm">
+                {info}
+              </div>
+            )}
 
             {step === 'credentials' && (
               <>
@@ -203,60 +343,118 @@ export function LoginForm() {
                   <button
                     type="button"
                     onClick={() => switchMethod('email')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-md transition-colors ${
                       method === 'email'
                         ? 'bg-white text-emerald-700 shadow-sm'
                         : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
                     <Mail className="w-4 h-4" />
-                    Email
+                    Email OTP
                   </button>
                   <button
                     type="button"
                     onClick={() => switchMethod('mobile')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-md transition-colors ${
                       method === 'mobile'
                         ? 'bg-white text-emerald-700 shadow-sm'
                         : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
                     <Phone className="w-4 h-4" />
-                    Mobile
+                    Mobile OTP
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchMethod('password')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-md transition-colors ${
+                      method === 'password'
+                        ? 'bg-white text-emerald-700 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Lock className="w-4 h-4" />
+                    Password
                   </button>
                 </div>
 
-                {method === 'email' ? (
-                  <Input
-                    label="Email Address"
-                    type="email"
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                  />
+                {method === 'password' ? (
+                  <>
+                    <Input
+                      label="Email Address"
+                      type="email"
+                      placeholder="you@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                    />
+                    <Input
+                      label="Password"
+                      type="password"
+                      placeholder="Enter password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Temporary access: use password <span className="font-medium">{TEMP_DEFAULT_OTP}</span>{' '}
+                      if your account password is not set yet.
+                    </p>
+                    <Button onClick={handlePasswordLogin} disabled={loading} className="w-full" size="lg">
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Lock className="w-4 h-4" />
+                          Sign In with Password
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : method === 'email' ? (
+                  <>
+                    <Input
+                      label="Email Address"
+                      type="email"
+                      placeholder="you@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                    />
+                    <Button onClick={handleSendOtp} disabled={loading} className="w-full" size="lg">
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4" />
+                          Send Verification Code
+                        </>
+                      )}
+                    </Button>
+                  </>
                 ) : (
-                  <Input
-                    label="Mobile Number"
-                    type="tel"
-                    placeholder="10-digit mobile number"
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    maxLength={10}
-                    autoComplete="tel"
-                  />
+                  <>
+                    <Input
+                      label="Mobile Number"
+                      type="tel"
+                      placeholder="10-digit mobile number"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      maxLength={10}
+                      autoComplete="tel"
+                    />
+                    <Button onClick={handleSendOtp} disabled={loading} className="w-full" size="lg">
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Phone className="w-4 h-4" />
+                          Send Verification Code
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
-
-                <Button onClick={handleSendOtp} disabled={loading} className="w-full" size="lg">
-                  {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      {method === 'email' ? <Mail className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
-                      Send Verification Code
-                    </>
-                  )}
-                </Button>
               </>
             )}
 
@@ -272,6 +470,9 @@ export function LoginForm() {
                   maxLength={6}
                   autoComplete="one-time-code"
                 />
+                <p className="text-xs text-gray-500">
+                  Temporary default OTP: <span className="font-medium">{TEMP_DEFAULT_OTP}</span>
+                </p>
                 <Button onClick={handleVerifyOtp} disabled={loading} className="w-full" size="lg">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & Continue'}
                 </Button>

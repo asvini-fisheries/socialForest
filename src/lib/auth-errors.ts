@@ -14,6 +14,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   otp_expired: 'Verification code has expired. Please request a new code.',
   otp_disabled: 'Login with verification code is disabled. Contact your administrator.',
   invalid_otp: 'Invalid verification code. Please check and try again.',
+  invalid_credentials: 'Invalid email or password. Please try again.',
+  invalid_login_credentials: 'Invalid email or password. Please try again.',
   over_email_send_rate_limit: 'Too many emails sent. Please wait a few minutes and try again.',
   over_sms_send_rate_limit: 'Too many SMS sent. Please wait a few minutes and try again.',
   user_not_found: 'No account found with this email or mobile. Contact your administrator.',
